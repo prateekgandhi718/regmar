@@ -11,12 +11,7 @@ const Navbar = () => {
   const scrolled = useScrollTop()
 
   return (
-    <div
-      className={cn(
-        'z-50 bg-background dark:bg-dark-bg fixed top-0 flex items-center w-full p-6',
-        scrolled && 'border-b shadow-sm'
-      )}
-    >
+    <div className={cn('z-50 bg-background dark:bg-dark-bg fixed top-0 flex items-center w-full p-6', scrolled && 'border-b shadow-sm')}>
       <Link href="/">
         <Logo />
       </Link>
@@ -34,4 +29,3 @@ const Navbar = () => {
 }
 
 export default Navbar
-

@@ -18,4 +18,3 @@ export const useScrollTop = (threshold = 10) => {
 
   return scrolled
 }
-

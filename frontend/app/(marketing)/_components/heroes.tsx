@@ -19,4 +19,3 @@ const Heroes = () => {
 }
 
 export default Heroes
-

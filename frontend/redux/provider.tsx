@@ -6,4 +6,3 @@ import { store } from './store'
 export const StateProvider = ({ children }: { children: React.ReactNode }) => {
   return <Provider store={store}>{children}</Provider>
 }
-

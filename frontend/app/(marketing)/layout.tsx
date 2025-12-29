@@ -10,4 +10,3 @@ const MarketingLayout = ({ children }: { children: React.ReactNode }) => {
 }
 
 export default MarketingLayout
-
