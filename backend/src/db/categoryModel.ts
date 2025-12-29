@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const CategorySchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
   emoji: { type: String },
+  color: { type: String },
 }, { timestamps: true });
 
 export const CategoryModel = mongoose.model('Category', CategorySchema);

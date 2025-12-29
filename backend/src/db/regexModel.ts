@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const RegexSchema = new mongoose.Schema({
-  domain: { type: String, required: true, unique: true },
+  domain: { type: String, required: true },
   amountRegex: { type: String, required: true },
   descriptionRegex: { type: String, required: true },
   dateRegex: { type: String },
@@ -12,7 +12,7 @@ const RegexSchema = new mongoose.Schema({
 
 export const RegexModel = mongoose.model('Regex', RegexSchema);
 
-export const getRegexByDomain = (domain: string) => RegexModel.findOne({ domain });
+export const getRegexesByDomain = (domain: string) => RegexModel.find({ domain });
 export const getRegexById = (id: string) => RegexModel.findById(id);
 export const createRegex = (values: Record<string, any>) => new RegexModel(values).save();
 export const updateRegexById = (id: string, values: Record<string, any>) => RegexModel.findByIdAndUpdate(id, values, { new: true });

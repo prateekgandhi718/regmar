@@ -11,13 +11,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { X, Plus, Trash2, Loader2 } from "lucide-react";
+import { X, Plus, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { 
   useAddAccountMutation, 
   useUpdateAccountMutation,
   useDeleteAccountMutation,
   Account 
 } from "@/redux/api/accountsApi";
+import { useGetLinkedAccountsQuery } from "@/redux/api/linkedAccountsApi";
+import Link from "next/link";
 
 interface AddAccountDrawerProps {
   isOpen: boolean;
@@ -31,6 +33,9 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
   const [accountNumber, setAccountNumber] = useState("");
   const [domains, setDomains] = useState<string[]>([""]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery();
+  const isLinked = linkedAccounts && linkedAccounts.some(acc => acc.isActive && acc.provider === 'gmail');
 
   const [addAccount] = useAddAccountMutation();
   const [updateAccount] = useUpdateAccountMutation();
@@ -129,6 +134,21 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
         </DrawerHeader>
 
         <div className="px-6 py-8 space-y-10 overflow-y-auto">
+          {!isLinked && !isLoadingLinked && (
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-4 items-start">
+              <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
+              <div className="space-y-2">
+                <p className="text-sm font-bold text-orange-800">Email Account Required</p>
+                <p className="text-xs text-orange-700 leading-relaxed">
+                  You need to link a Gmail account in settings before you can add bank accounts. This allows us to fetch transactions automatically.
+                </p>
+                <Button variant="link" className="p-0 h-auto text-xs text-orange-800 font-bold underline" asChild>
+                  <Link href="/settings">Go to Settings</Link>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Step 1: Account Info */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
@@ -219,7 +239,7 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
           <Button 
             className="flex-1 h-14 rounded-2xl font-black bg-linear-to-r from-orange-500 to-rose-500 text-white border-none shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
             onClick={handleSubmit}
-            disabled={isSubmitting || !title}
+            disabled={isSubmitting || !title || !isLinked}
           >
             {isSubmitting ? (
               <Loader2 className="h-5 w-5 animate-spin" />

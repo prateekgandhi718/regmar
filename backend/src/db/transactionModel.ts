@@ -17,6 +17,6 @@ export const TransactionModel = mongoose.model('Transaction', TransactionSchema)
 export const getTransactionsByAccountId = (accountId: string) => TransactionModel.find({ accountId }).populate('categoryId');
 export const getTransactionsByUserId = (userId: string) => TransactionModel.find({ userId }).populate('categoryId').populate('accountId');
 export const createTransaction = (values: Record<string, any>) => new TransactionModel(values).save();
-export const updateTransactionById = (id: string, values: Record<string, any>) => TransactionModel.findByIdAndUpdate(id, values, { new: true });
+export const updateTransactionById = (id: string, values: Record<string, any>) => TransactionModel.findByIdAndUpdate(id, values, { new: true }).populate('categoryId').populate('accountId');
 export const deleteTransactionById = (id: string) => TransactionModel.findByIdAndDelete(id);
 export const deleteTransactionsByAccountId = (accountId: string) => TransactionModel.deleteMany({ accountId });
