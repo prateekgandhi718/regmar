@@ -1,15 +1,18 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { setupListeners } from '@reduxjs/toolkit/query'
 import { authApi } from './api/authApi'
+import { accountsApi } from './api/accountsApi'
 import authReducer from './features/authSlice'
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     [authApi.reducerPath]: authApi.reducer,
+    [accountsApi.reducerPath]: accountsApi.reducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(authApi.middleware),
+  middleware: (getDefaultMiddleware) => 
+    getDefaultMiddleware().concat(authApi.middleware, accountsApi.middleware),
 })
 
 setupListeners(store.dispatch)
