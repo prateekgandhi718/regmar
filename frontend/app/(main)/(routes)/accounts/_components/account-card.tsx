@@ -6,16 +6,19 @@ import { cn } from "@/lib/utils";
 interface AccountCardProps {
   title: string;
   accountNumber?: string;
-  icon?: string;
+  domainName?: string;
   className?: string;
 }
 
 export const AccountCard = ({
   title,
   accountNumber,
-  icon,
+  domainName,
   className,
 }: AccountCardProps) => {
+  const extractedDomain = domainName?.split("@").pop();
+  const iconUrl = extractedDomain ? `https://www.google.com/s2/favicons?domain_url=${extractedDomain}&sz=64` : null;
+
   return (
     <Card
       className={cn(
@@ -41,11 +44,14 @@ export const AccountCard = ({
               •••• {accountNumber.slice(-4)}
             </p>
           )}
+          <p className="text-[8px] font-bold opacity-60 uppercase tracking-tighter">
+            Synced
+          </p>
         </div>
         <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-lg border border-white/20">
-           {icon ? (
+           {iconUrl ? (
              <Image 
-               src={icon} 
+               src={iconUrl} 
                alt={title} 
                width={16}
                height={16}

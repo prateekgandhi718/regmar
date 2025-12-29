@@ -148,13 +148,6 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
                 />
               </div>
               <div className="flex items-center px-4 h-14 border-b border-border/50">
-                <span className="w-24 text-sm font-semibold text-foreground/70">Icon</span>
-                <div className="flex-1 flex justify-end items-center gap-3">
-                  <button className="text-sm font-bold text-orange-500 hover:opacity-80 transition-opacity">Change Icon</button>
-                  <div className="h-8 w-8 bg-background rounded-lg border border-border/50 shadow-sm" />
-                </div>
-              </div>
-              <div className="flex items-center px-4 h-14 border-b border-border/50">
                 <Label htmlFor="currency" className="w-24 text-sm font-semibold text-foreground/70">Currency</Label>
                 <Input 
                   id="currency"

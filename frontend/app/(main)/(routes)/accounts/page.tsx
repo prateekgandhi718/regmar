@@ -57,6 +57,7 @@ const AccountsPage = () => {
                 <AccountCard
                   title={account.title}
                   accountNumber={account.accountNumber}
+                  domainName={account.domainIds?.[0]?.fromEmail}
                 />
               </div>
             ))}
