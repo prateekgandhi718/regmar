@@ -1,20 +1,18 @@
-import { configureStore, createSlice } from '@reduxjs/toolkit'
-
-// Create a dummy slice to avoid empty reducer error
-const dummySlice = createSlice({
-  name: 'dummy',
-  initialState: {},
-  reducers: {},
-})
+import { configureStore } from '@reduxjs/toolkit'
+import { setupListeners } from '@reduxjs/toolkit/query'
+import { authApi } from './api/authApi'
+import authReducer from './features/authSlice'
 
 export const store = configureStore({
   reducer: {
-    dummy: dummySlice.reducer,
-    // Add your real reducers here as you build features
+    auth: authReducer,
+    [authApi.reducerPath]: authApi.reducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware({}),
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(authApi.middleware),
 })
+
+setupListeners(store.dispatch)
 
 export type RootState = ReturnType<typeof store.getState>
 export type AppDispatch = typeof store.dispatch
