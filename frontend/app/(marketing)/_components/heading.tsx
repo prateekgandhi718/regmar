@@ -43,18 +43,18 @@ export const Heading = () => {
       </h3>
       {user ? (
         <Button asChild>
-          <Link href="/documents">
+          <Link href="/home">
             Enter Regmar
             <ArrowRight className="h-4 w-4 ml-2" />
           </Link>
         </Button>
       ) : (
-        <Button asChild>
-          <Link href="/signup">
-            Get Regmar Free
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Link>
-        </Button>
+      <Button asChild>
+        <Link href="/signup">
+          Get Regmar Free
+          <ArrowRight className="h-4 w-4 ml-2" />
+        </Link>
+      </Button>
       )}
     </div>
   )

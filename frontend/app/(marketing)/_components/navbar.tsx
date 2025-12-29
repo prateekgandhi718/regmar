@@ -50,12 +50,12 @@ const Navbar = () => {
           </>
         ) : (
           <>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/login">Log in</Link>
-            </Button>
-            <Button size="sm" asChild>
-              <Link href="/signup">Get Started</Link>
-            </Button>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/login">Log in</Link>
+        </Button>
+        <Button size="sm" asChild>
+          <Link href="/signup">Get Started</Link>
+        </Button>
           </>
         )}
         <ModeToggle />

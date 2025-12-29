@@ -5,6 +5,7 @@ import { selectCurrentUser } from '@/redux/features/authSlice'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { Spinner } from '@/components/spinner'
+import BottomNavbar from '@/components/bottom-navbar'
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const user = useAppSelector(selectCurrentUser)
@@ -27,6 +28,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="h-full dark:bg-dark-bg">
       <main className="h-full">{children}</main>
+      <BottomNavbar />
     </div>
   )
 }
