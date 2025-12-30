@@ -3,21 +3,27 @@
 import { useAppSelector } from '@/redux/hooks'
 import { selectCurrentUser } from '@/redux/features/authSlice'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Spinner } from '@/components/spinner'
 import BottomNavbar from '@/components/bottom-navbar'
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
   const user = useAppSelector(selectCurrentUser)
   const router = useRouter()
+  const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    if (!user) {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (isMounted && !user) {
       router.push('/')
     }
-  }, [user, router])
+  }, [user, router, isMounted])
 
-  if (!user) {
+  if (!isMounted || !user) {
     return (
       <div className="h-full flex items-center justify-center">
         <Spinner size="lg" />
@@ -27,7 +33,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="h-full dark:bg-dark-bg">
-      <main className="h-full">{children}</main>
+      <main className="h-full pb-16">{children}</main>
       <BottomNavbar />
     </div>
   )

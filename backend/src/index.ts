@@ -6,6 +6,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDB } from './db/connection';
 import router from './router';
+import { seedCategories } from './helpers/seedCategories';
 
 dotenv.config();
 
@@ -27,6 +28,8 @@ server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}/`);
 });
 
-connectDB();
+connectDB().then(() => {
+  seedCategories();
+});
 
 app.use('/', router());
