@@ -5,19 +5,28 @@ import { useGetTransactionsQuery, Transaction } from "@/redux/api/transactionsAp
 import { AlertCircle, ArrowRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, parseISO, isSameDay } from "date-fns";
+import { format, parseISO, isSameDay, subDays, subMonths, isAfter } from "date-fns";
 import { useMemo, useState } from "react";
 import { TransactionItem } from "./_components/tagged-transaction-item";
 import { formatAmount } from "@/lib/utils";
 import { QuickTagDrawer } from "./_components/quick-tag-drawer";
 import { TransactionDetailDrawer } from "./_components/transaction-detail-drawer";
+import { TransactionSummary } from "./_components/transaction-summary";
 
 const TransactionsPage = () => {
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery();
   const { data: transactions, isLoading: isLoadingTransactions } = useGetTransactionsQuery();
   
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedMonthYear, setSelectedMonthYear] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<"30d" | "6m" | "12m" | "all">("all");
   const [isQuickTagOpen, setIsQuickTagOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -41,8 +50,28 @@ const TransactionsPage = () => {
   const groupedTransactions = useMemo(() => {
     if (!transactions) return [];
 
+    let filteredTxs = [...transactions];
+
+    // Date range filter
+    const now = new Date();
+    if (dateRange === "30d") {
+      const cutoff = subDays(now, 30);
+      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), cutoff));
+    } else if (dateRange === "6m") {
+      const cutoff = subMonths(now, 6);
+      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), cutoff));
+    } else if (dateRange === "12m") {
+      const cutoff = subMonths(now, 12);
+      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), cutoff));
+    }
+
+    // Month specific filter
+    if (selectedMonthYear) {
+      filteredTxs = filteredTxs.filter(tx => format(parseISO(tx.newDate || tx.originalDate), "MMM yyyy").toUpperCase() === selectedMonthYear);
+    }
+
     // Sort transactions by effective date descending
-    const sortedTxs = [...transactions].sort((a, b) => {
+    const sortedTxs = filteredTxs.sort((a, b) => {
       const dateA = new Date(a.newDate || a.originalDate).getTime();
       const dateB = new Date(b.newDate || b.originalDate).getTime();
       return dateB - dateA;
@@ -78,7 +107,7 @@ const TransactionsPage = () => {
       );
 
       if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
-        monthGroup.total += tx.originalAmount;
+        monthGroup.total += tx.newAmount || tx.originalAmount;
       }
 
       let dayGroup = monthGroup.days.find(d => isSameDay(d.date, date));
@@ -88,13 +117,13 @@ const TransactionsPage = () => {
       }
 
       if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
-        dayGroup.total += tx.originalAmount;
+        dayGroup.total += tx.newAmount || tx.originalAmount;
       }
       dayGroup.transactions.push(tx);
     });
 
     return monthGroups;
-  }, [transactions]);
+  }, [transactions, selectedMonthYear, dateRange]);
 
   if (isLoadingLinked || isLoadingTransactions) {
     return (
@@ -114,10 +143,67 @@ const TransactionsPage = () => {
     <div className="p-6 space-y-8 pb-20">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black tracking-tight">Transactions</h1>
-        <Button variant="secondary" size="sm" className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4">
-          All Time <ChevronDown className="ml-1 h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          {selectedMonthYear && (
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="rounded-xl font-bold bg-orange-100 text-orange-600 border-none h-9 px-4 hover:bg-orange-200"
+              onClick={() => setSelectedMonthYear(null)}
+            >
+              {selectedMonthYear} <span className="ml-1 opacity-50">×</span>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4"
+              >
+                {dateRange === "30d" ? "Last 30 Days" : 
+                 dateRange === "6m" ? "Last 6 Months" : 
+                 dateRange === "12m" ? "Last 12 Months" : "All Time"}
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl p-2 border-border/50 shadow-xl">
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("30d")}
+              >
+                Last 30 Days
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("6m")}
+              >
+                Last 6 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("12m")}
+              >
+                Last 12 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("all")}
+              >
+                All Time
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
+
+      {isEmailLinked && transactions && (
+        <TransactionSummary 
+          transactions={transactions}
+          selectedMonthYear={selectedMonthYear}
+          dateRange={dateRange}
+        />
+      )}
 
       {!isEmailLinked && (
         <div className="bg-orange-50 dark:bg-orange-500/5 border-2 border-orange-100 dark:border-orange-500/10 rounded-[2.5rem] p-8 space-y-4 relative overflow-hidden group">
