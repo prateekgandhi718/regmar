@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export const formatAmount = (amount: number) => {
   if (amount >= 1000) {
-    return (amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1) + "K";
+    return (amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1) + 'K'
   }
-  return amount.toLocaleString('en-IN');
-};
+  return amount.toLocaleString('en-IN')
+}

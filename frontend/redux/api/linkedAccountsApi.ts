@@ -1,43 +1,38 @@
-import { createApi } from "@reduxjs/toolkit/query/react";
-import { baseQueryWithReauth } from "./baseQuery";
+import { createApi } from '@reduxjs/toolkit/query/react'
+import { baseQueryWithReauth } from './baseQuery'
 
 export interface LinkedAccount {
-  id: string;
-  email: string;
-  provider: string;
-  isActive: boolean;
+  id: string
+  email: string
+  provider: string
+  isActive: boolean
 }
 
 export const linkedAccountsApi = createApi({
-  reducerPath: "linkedAccountsApi",
+  reducerPath: 'linkedAccountsApi',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["LinkedAccount"],
+  tagTypes: ['LinkedAccount'],
   endpoints: (builder) => ({
     getLinkedAccounts: builder.query<LinkedAccount[], void>({
-      query: () => "/linked-accounts",
-      providesTags: ["LinkedAccount"],
+      query: () => '/linked-accounts',
+      providesTags: ['LinkedAccount'],
     }),
     linkGmailAccount: builder.mutation<LinkedAccount, { email: string; appPassword: string }>({
       query: (body) => ({
-        url: "/linked-accounts/gmail",
-        method: "POST",
+        url: '/linked-accounts/gmail',
+        method: 'POST',
         body,
       }),
-      invalidatesTags: ["LinkedAccount"],
+      invalidatesTags: ['LinkedAccount'],
     }),
     unlinkAccount: builder.mutation<{ message: string }, string>({
       query: (id) => ({
         url: `/linked-accounts/${id}`,
-        method: "DELETE",
+        method: 'DELETE',
       }),
-      invalidatesTags: ["LinkedAccount"],
+      invalidatesTags: ['LinkedAccount'],
     }),
   }),
-});
+})
 
-export const {
-  useGetLinkedAccountsQuery,
-  useLinkGmailAccountMutation,
-  useUnlinkAccountMutation,
-} = linkedAccountsApi;
-
+export const { useGetLinkedAccountsQuery, useLinkGmailAccountMutation, useUnlinkAccountMutation } = linkedAccountsApi

@@ -19,15 +19,8 @@ export const store = configureStore({
     [categoriesApi.reducerPath]: categoriesApi.reducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
-  middleware: (getDefaultMiddleware) => 
-    getDefaultMiddleware().concat(
-      authApi.middleware, 
-      accountsApi.middleware, 
-      linkedAccountsApi.middleware,
-      syncApi.middleware,
-      transactionsApi.middleware,
-      categoriesApi.middleware
-    ),
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(authApi.middleware, accountsApi.middleware, linkedAccountsApi.middleware, syncApi.middleware, transactionsApi.middleware, categoriesApi.middleware),
 })
 
 setupListeners(store.dispatch)
