@@ -1,13 +1,12 @@
 'use client'
 
-import { Home, CreditCard, TrendingUp, Settings, Wallet} from 'lucide-react'
+import { Home, CreditCard, TrendingUp, Settings, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const BottomNavbar = () => {
   const pathname = usePathname()
-
 
   const tabs = [
     {
@@ -48,10 +47,7 @@ const BottomNavbar = () => {
             <Link
               key={tab.href}
               href={tab.href}
-              className={cn(
-                'flex flex-col items-center justify-center flex-1 h-full gap-y-1 transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground'
-              )}
+              className={cn('flex flex-col items-center justify-center flex-1 h-full gap-y-1 transition-colors', isActive ? 'text-primary' : 'text-muted-foreground')}
             >
               <Icon className="h-5 w-5" />
               <span className="text-[10px] font-medium">{tab.label}</span>
@@ -64,4 +60,3 @@ const BottomNavbar = () => {
 }
 
 export default BottomNavbar
-

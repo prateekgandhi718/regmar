@@ -1,47 +1,41 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { AccountsHeader } from "./_components/accounts-header";
-import { AccountCard } from "./_components/account-card";
-import { AddAccountDrawer } from "./_components/add-account-drawer";
-import { useGetAccountsQuery, Account } from "@/redux/api/accountsApi";
-import { Loader2 } from "lucide-react";
-import { SetupPrompts } from "@/components/setup-prompts";
+import { useState } from 'react'
+import { AccountsHeader } from './_components/accounts-header'
+import { AccountCard } from './_components/account-card'
+import { AddAccountDrawer } from './_components/add-account-drawer'
+import { useGetAccountsQuery, Account } from '@/redux/api/accountsApi'
+import { Loader2 } from 'lucide-react'
+import { SetupPrompts } from '@/components/setup-prompts'
 
 const AccountsPage = () => {
-  const [search, setSearch] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [search, setSearch] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
 
-  const { data: accounts = [], isLoading } = useGetAccountsQuery();
+  const { data: accounts = [], isLoading } = useGetAccountsQuery()
 
-  const filteredAccounts = accounts.filter((acc) =>
-    acc.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredAccounts = accounts.filter((acc) => acc.title.toLowerCase().includes(search.toLowerCase()))
 
   const handleAdd = () => {
-    setSelectedAccount(null);
-    setIsOpen(true);
-  };
+    setSelectedAccount(null)
+    setIsOpen(true)
+  }
 
   const handleEdit = (account: Account) => {
-    setSelectedAccount(account);
-    setIsOpen(true);
-  };
+    setSelectedAccount(account)
+    setIsOpen(true)
+  }
 
   const handleClose = () => {
-    setIsOpen(false);
-    setSelectedAccount(null);
-  };
+    setIsOpen(false)
+    setSelectedAccount(null)
+  }
 
   return (
     <div className="flex flex-col min-h-screen pb-20 bg-background">
-      <AccountsHeader 
-        search={search} 
-        setSearch={setSearch} 
-        onAdd={handleAdd} 
-      />
-      
+      <AccountsHeader search={search} setSearch={setSearch} onAdd={handleAdd} />
+
       <div className="flex-1 px-4 mt-6 space-y-6 overflow-y-auto">
         <SetupPrompts />
         {isLoading ? (
@@ -51,17 +45,8 @@ const AccountsPage = () => {
         ) : (
           <div className="flex flex-col gap-4">
             {filteredAccounts.map((account) => (
-              <div 
-                key={account._id} 
-                onClick={() => handleEdit(account)}
-                className="cursor-pointer active:scale-[0.98] transition-transform"
-              >
-                <AccountCard
-                  title={account.title}
-                  accountNumber={account.accountNumber}
-                  domainName={account.domainIds?.[0]?.fromEmail}
-                  currency={account.currency}
-                />
+              <div key={account._id} onClick={() => handleEdit(account)} className="cursor-pointer active:scale-[0.98] transition-transform">
+                <AccountCard title={account.title} accountNumber={account.accountNumber} domainName={account.domainIds?.[0]?.fromEmail} currency={account.currency} />
               </div>
             ))}
 
@@ -74,13 +59,9 @@ const AccountsPage = () => {
         )}
       </div>
 
-      <AddAccountDrawer 
-        isOpen={isOpen} 
-        onClose={handleClose} 
-        initialData={selectedAccount}
-      />
+      <AddAccountDrawer isOpen={isOpen} onClose={handleClose} initialData={selectedAccount} />
     </div>
-  );
-};
+  )
+}
 
-export default AccountsPage;
+export default AccountsPage

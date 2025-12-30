@@ -1,154 +1,128 @@
-"use client";
+'use client'
 
-import { useMemo } from "react";
-import { Transaction } from "@/redux/api/transactionsApi";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, isAfter, subDays } from "date-fns";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  ResponsiveContainer, 
-  Cell 
-} from "recharts";
-import { formatAmount } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { useMemo } from 'react'
+import { Transaction } from '@/redux/api/transactionsApi'
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval, isAfter, subDays } from 'date-fns'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
+import { formatAmount } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
-const ACCOUNT_COLORS = [
-  "bg-red-500",
-  "bg-indigo-500",
-  "bg-purple-500",
-  "bg-cyan-500",
-  "bg-emerald-500",
-  "bg-amber-500",
-  "bg-pink-500",
-  "bg-teal-500",
-  "bg-rose-500",
-  "bg-lime-500"
-];
+const ACCOUNT_COLORS = ['bg-red-500', 'bg-indigo-500', 'bg-purple-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-teal-500', 'bg-rose-500', 'bg-lime-500']
 
 interface TransactionSummaryProps {
-  transactions: Transaction[];
-  selectedMonthYear: string | null;
-  dateRange: "30d" | "6m" | "12m" | "all";
+  transactions: Transaction[]
+  selectedMonthYear: string | null
+  dateRange: '30d' | '6m' | '12m' | 'all'
 }
 
-export const TransactionSummary = ({ 
-  transactions, 
-  selectedMonthYear, 
-  dateRange
-}: TransactionSummaryProps) => {
-
+export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange }: TransactionSummaryProps) => {
   const chartData = useMemo(() => {
-    if (!transactions.length) return [];
+    if (!transactions.length) return []
 
     // Find the range of months to display
-    let filteredTxs = [...transactions];
-    const now = new Date();
+    let filteredTxs = [...transactions]
+    const now = new Date()
 
-    if (dateRange === "30d") {
-      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), subDays(now, 30)));
-    } else if (dateRange === "6m") {
-      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), subMonths(now, 6)));
-    } else if (dateRange === "12m") {
-      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), subMonths(now, 12)));
+    if (dateRange === '30d') {
+      filteredTxs = filteredTxs.filter((tx) => isAfter(parseISO(tx.newDate || tx.originalDate), subDays(now, 30)))
+    } else if (dateRange === '6m') {
+      filteredTxs = filteredTxs.filter((tx) => isAfter(parseISO(tx.newDate || tx.originalDate), subMonths(now, 6)))
+    } else if (dateRange === '12m') {
+      filteredTxs = filteredTxs.filter((tx) => isAfter(parseISO(tx.newDate || tx.originalDate), subMonths(now, 12)))
     }
 
-    if (!filteredTxs.length) return [];
+    if (!filteredTxs.length) return []
 
     // Sort to find first and last transaction dates in range
-    const sortedTxsInRange = [...filteredTxs].sort((a, b) => 
-      new Date(a.newDate || a.originalDate).getTime() - new Date(b.newDate || b.originalDate).getTime()
-    );
+    const sortedTxsInRange = [...filteredTxs].sort((a, b) => new Date(a.newDate || a.originalDate).getTime() - new Date(b.newDate || b.originalDate).getTime())
 
-    const firstDate = startOfMonth(parseISO(sortedTxsInRange[0].newDate || sortedTxsInRange[0].originalDate));
-    const lastDate = startOfMonth(parseISO(sortedTxsInRange[sortedTxsInRange.length - 1].newDate || sortedTxsInRange[sortedTxsInRange.length - 1].originalDate));
+    const firstDate = startOfMonth(parseISO(sortedTxsInRange[0].newDate || sortedTxsInRange[0].originalDate))
+    const lastDate = startOfMonth(parseISO(sortedTxsInRange[sortedTxsInRange.length - 1].newDate || sortedTxsInRange[sortedTxsInRange.length - 1].originalDate))
 
-    const months = [];
-    let current = firstDate;
+    const months = []
+    let current = firstDate
     while (current <= lastDate) {
-      months.push(current);
-      current = startOfMonth(subMonths(current, -1)); // Add 1 month
+      months.push(current)
+      current = startOfMonth(subMonths(current, -1)) // Add 1 month
     }
 
-    return months.map(monthDate => {
-      const monthYear = format(monthDate, "MMM yy").toUpperCase();
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
+    return months.map((monthDate) => {
+      const monthYear = format(monthDate, 'MMM yy').toUpperCase()
+      const monthStart = startOfMonth(monthDate)
+      const monthEnd = endOfMonth(monthDate)
 
-      let expenses = 0;
-      let investments = 0;
+      let expenses = 0
+      let investments = 0
 
-      transactions.forEach(tx => {
-        const txDate = parseISO(tx.newDate || tx.originalDate);
+      transactions.forEach((tx) => {
+        const txDate = parseISO(tx.newDate || tx.originalDate)
         if (isWithinInterval(txDate, { start: monthStart, end: monthEnd })) {
-          const isInvestment = tx.categoryId?.name === "Investment";
-          const isSelfTransfer = tx.categoryId?.name === "Self Transfer";
-          
-          if (tx.type === "debit") {
+          const isInvestment = tx.categoryId?.name === 'Investment'
+          const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
+
+          if (tx.type === 'debit') {
             if (isInvestment) {
-              investments += tx.newAmount || tx.originalAmount;
+              investments += tx.newAmount || tx.originalAmount
             } else if (!isSelfTransfer) {
-              expenses += tx.newAmount || tx.originalAmount;
+              expenses += tx.newAmount || tx.originalAmount
             }
           }
         }
-      });
+      })
 
       return {
         monthYear,
         expenses: Math.round(expenses),
         investments: Math.round(investments),
-        fullMonthYear: format(monthDate, "MMM yyyy").toUpperCase(),
-      };
-    });
-  }, [transactions, dateRange]);
+        fullMonthYear: format(monthDate, 'MMM yyyy').toUpperCase(),
+      }
+    })
+  }, [transactions, dateRange])
 
   const selectedData = useMemo(() => {
     if (!selectedMonthYear) {
       // Calculate totals for all displayed months
-      let totalExpenses = 0;
-      let totalInvestments = 0;
-      const accountMap: Record<string, number> = {};
-      const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {};
+      let totalExpenses = 0
+      let totalInvestments = 0
+      const accountMap: Record<string, number> = {}
+      const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {}
 
-      const monthsInRange = chartData.map(d => d.fullMonthYear);
+      const monthsInRange = chartData.map((d) => d.fullMonthYear)
 
-      transactions.forEach(tx => {
-        const txDate = parseISO(tx.newDate || tx.originalDate);
-        const txMonthYear = format(txDate, "MMM yyyy").toUpperCase();
-        
+      transactions.forEach((tx) => {
+        const txDate = parseISO(tx.newDate || tx.originalDate)
+        const txMonthYear = format(txDate, 'MMM yyyy').toUpperCase()
+
         if (monthsInRange.includes(txMonthYear)) {
-          const isInvestment = tx.categoryId?.name === "Investment";
-          const isSelfTransfer = tx.categoryId?.name === "Self Transfer";
-          
-          if (tx.type === "debit") {
+          const isInvestment = tx.categoryId?.name === 'Investment'
+          const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
+
+          if (tx.type === 'debit') {
             if (isInvestment) {
-              totalInvestments += tx.originalAmount;
+              totalInvestments += tx.originalAmount
             } else if (!isSelfTransfer) {
-              totalExpenses += tx.originalAmount;
-              
+              totalExpenses += tx.originalAmount
+
               // Accounts split (only for expenses)
-              const accName = tx.accountId.title;
-              accountMap[accName] = (accountMap[accName] || 0) + tx.originalAmount;
+              const accName = tx.accountId.title
+              accountMap[accName] = (accountMap[accName] || 0) + tx.originalAmount
 
               // Category split (only for expenses)
               if (tx.categoryId) {
-                const catName = tx.categoryId.name;
+                const catName = tx.categoryId.name
                 if (!categoryMap[catName]) {
-                  categoryMap[catName] = { 
-                    amount: 0, 
-                    emoji: tx.categoryId.emoji || "📁", 
-                    color: tx.categoryId.color || "#94a3b8" 
-                  };
+                  categoryMap[catName] = {
+                    amount: 0,
+                    emoji: tx.categoryId.emoji || '📁',
+                    color: tx.categoryId.color || '#94a3b8',
+                  }
                 }
-                categoryMap[catName].amount += tx.originalAmount;
+                categoryMap[catName].amount += tx.originalAmount
               }
             }
           }
         }
-      });
+      })
 
       return {
         avgExpenses: totalExpenses / (chartData.length || 1),
@@ -157,50 +131,48 @@ export const TransactionSummary = ({
         categories: Object.entries(categoryMap)
           .map(([name, data]) => ({ name, ...data, percent: (data.amount / totalExpenses) * 100 }))
           .sort((a, b) => b.amount - a.amount),
-        displayRange: chartData.length > 0 
-          ? (chartData.length > 1 ? `${chartData[0].monthYear} - ${chartData[chartData.length - 1].monthYear}` : chartData[0].monthYear)
-          : ""
-      };
+        displayRange: chartData.length > 0 ? (chartData.length > 1 ? `${chartData[0].monthYear} - ${chartData[chartData.length - 1].monthYear}` : chartData[0].monthYear) : '',
+      }
     }
 
     // Single month selected
-    let totalExpenses = 0;
-    let totalInvestments = 0;
-    const accountMap: Record<string, number> = {};
-    const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {};
+    let totalExpenses = 0
+    let totalInvestments = 0
+    const accountMap: Record<string, number> = {}
+    const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {}
 
-    transactions.forEach(tx => {
-      const txDate = parseISO(tx.newDate || tx.originalDate);
-      const txMonthYear = format(txDate, "MMM yyyy").toUpperCase();
+    transactions.forEach((tx) => {
+      const txDate = parseISO(tx.newDate || tx.originalDate)
+      const txMonthYear = format(txDate, 'MMM yyyy').toUpperCase()
 
       if (txMonthYear === selectedMonthYear) {
-        const isInvestment = tx.categoryId?.name === "Investment";
-        const isSelfTransfer = tx.categoryId?.name === "Self Transfer";
-        
-        if (tx.type === "debit") {
+        const isInvestment = tx.categoryId?.name === 'Investment'
+        const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
+
+        if (tx.type === 'debit') {
           if (isInvestment) {
-            totalInvestments += tx.originalAmount;
+            totalInvestments += tx.originalAmount
           } else if (!isSelfTransfer) {
-            totalExpenses += tx.originalAmount;
-            
-            const accName = tx.accountId.title;
-            accountMap[accName] = (accountMap[accName] || 0) + tx.originalAmount;
+            totalExpenses += tx.originalAmount
+
+            const accName = tx.accountId.title
+            accountMap[accName] = (accountMap[accName] || 0) + tx.originalAmount
 
             if (tx.categoryId) {
-              const catName = tx.categoryId.name;
+              const catName = tx.categoryId.name
               if (!categoryMap[catName]) {
-                categoryMap[catName] = { 
-                  amount: 0, 
-                  emoji: tx.categoryId.emoji || "📁", 
-                  color: tx.categoryId.color || "#94a3b8" 
-                };
+                categoryMap[catName] = {
+                  amount: 0,
+                  emoji: tx.categoryId.emoji || '📁',
+                  color: tx.categoryId.color || '#94a3b8',
+                }
               }
-              categoryMap[catName].amount += tx.originalAmount;
+              categoryMap[catName].amount += tx.originalAmount
             }
           }
         }
       }
-    });
+    })
 
     return {
       avgExpenses: totalExpenses,
@@ -209,9 +181,9 @@ export const TransactionSummary = ({
       categories: Object.entries(categoryMap)
         .map(([name, data]) => ({ name, ...data, percent: (data.amount / totalExpenses) * 100 }))
         .sort((a, b) => b.amount - a.amount),
-      displayRange: selectedMonthYear
-    };
-  }, [transactions, selectedMonthYear, chartData]);
+      displayRange: selectedMonthYear,
+    }
+  }, [transactions, selectedMonthYear, chartData])
 
   return (
     <div className="space-y-6">
@@ -220,60 +192,30 @@ export const TransactionSummary = ({
         <h2 className="text-xl font-black">{selectedData.displayRange}</h2>
         <div className="flex gap-4">
           <span className="text-sm font-bold text-orange-500">
-            -₹{formatAmount(selectedData.avgExpenses)}{!selectedMonthYear && "/mth"}
+            -₹{formatAmount(selectedData.avgExpenses)}
+            {!selectedMonthYear && '/mth'}
           </span>
           <span className="text-sm font-bold text-blue-400">
-            ₹{formatAmount(selectedData.avgInvestments)}{!selectedMonthYear && "/mth"}
+            ₹{formatAmount(selectedData.avgInvestments)}
+            {!selectedMonthYear && '/mth'}
           </span>
         </div>
       </div>
 
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart 
-            data={chartData} 
-            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-          >
+          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis 
-              dataKey="monthYear" 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 12, fontWeight: 600, fill: "#64748b" }} 
-              dy={10}
-            />
-            <YAxis 
-              axisLine={false} 
-              tickLine={false} 
-              tick={{ fontSize: 10, fontWeight: 600, fill: "#94a3b8" }}
-              tickFormatter={(value) => `${value / 1000}K`}
-            />
-            <Bar 
-              name="investments"
-              dataKey="investments" 
-              stackId="a" 
-              radius={[0, 0, 0, 0]}
-              pointerEvents="none"
-            >
+            <XAxis dataKey="monthYear" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }} tickFormatter={(value) => `${value / 1000}K`} />
+            <Bar name="investments" dataKey="investments" stackId="a" radius={[0, 0, 0, 0]} pointerEvents="none">
               {chartData.map((entry, index) => (
-                <Cell 
-                  key={`cell-inv-${index}`} 
-                  fill="#60a5fa" 
-                />
+                <Cell key={`cell-inv-${index}`} fill="#60a5fa" />
               ))}
             </Bar>
-            <Bar 
-              name="expenses"
-              dataKey="expenses" 
-              stackId="a" 
-              radius={[4, 4, 0, 0]}
-              pointerEvents="none"
-            >
+            <Bar name="expenses" dataKey="expenses" stackId="a" radius={[4, 4, 0, 0]} pointerEvents="none">
               {chartData.map((entry, index) => (
-                <Cell 
-                  key={`cell-exp-${index}`} 
-                  fill="#f97316" 
-                />
+                <Cell key={`cell-exp-${index}`} fill="#f97316" />
               ))}
             </Bar>
           </BarChart>
@@ -296,23 +238,13 @@ export const TransactionSummary = ({
         <div className="space-y-3">
           <div className="h-4 w-full flex rounded-full overflow-hidden bg-secondary/30">
             {selectedData.accounts.map((acc, i) => (
-              <div 
-                key={acc.name} 
-                className={cn(
-                  "h-full",
-                  ACCOUNT_COLORS[i % ACCOUNT_COLORS.length]
-                )}
-                style={{ width: `${acc.percent}%` }}
-              />
+              <div key={acc.name} className={cn('h-full', ACCOUNT_COLORS[i % ACCOUNT_COLORS.length])} style={{ width: `${acc.percent}%` }} />
             ))}
           </div>
           <div className="flex flex-wrap gap-4">
             {selectedData.accounts.map((acc, i) => (
               <div key={acc.name} className="flex items-center gap-2">
-                <div className={cn(
-                  "h-2 w-2 rounded-full",
-                  ACCOUNT_COLORS[i % ACCOUNT_COLORS.length]
-                )} />
+                <div className={cn('h-2 w-2 rounded-full', ACCOUNT_COLORS[i % ACCOUNT_COLORS.length])} />
                 <span className="text-xs font-bold">{acc.name}</span>
                 <span className="text-xs font-bold text-muted-foreground">{Math.round(acc.percent)}%</span>
               </div>
@@ -326,14 +258,8 @@ export const TransactionSummary = ({
         <div className="space-y-4 overflow-x-auto pb-2 scrollbar-hide">
           <div className="flex gap-3 min-w-max">
             {selectedData.categories.map((cat) => (
-              <div 
-                key={cat.name} 
-                className="bg-secondary/20 p-4 rounded-3xl flex flex-col gap-2 min-w-[120px]"
-              >
-                <div 
-                  className="h-10 w-16 rounded-2xl flex items-center justify-center text-xl"
-                  style={{ backgroundColor: cat.color + '20' }}
-                >
+              <div key={cat.name} className="bg-secondary/20 p-4 rounded-3xl flex flex-col gap-2 min-w-[120px]">
+                <div className="h-10 w-16 rounded-2xl flex items-center justify-center text-xl" style={{ backgroundColor: cat.color + '20' }}>
                   {cat.emoji}
                 </div>
                 <div className="space-y-0.5">
@@ -346,5 +272,5 @@ export const TransactionSummary = ({
         </div>
       )}
     </div>
-  );
-};
+  )
+}

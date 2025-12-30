@@ -1,51 +1,38 @@
-"use client";
+'use client'
 
-import { Transaction } from "@/redux/api/transactionsApi";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Transaction } from '@/redux/api/transactionsApi'
+import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
 
 interface TransactionItemProps {
-  transaction: Transaction;
-  onClick?: (transaction: Transaction) => void;
-  onTagClick?: (transaction: Transaction) => void;
+  transaction: Transaction
+  onClick?: (transaction: Transaction) => void
+  onTagClick?: (transaction: Transaction) => void
 }
 
 export const TransactionItem = ({ transaction, onClick, onTagClick }: TransactionItemProps) => {
-  const isDebit = transaction.type === "debit";
-  const isTagged = !!transaction.categoryId;
-  
+  const isDebit = transaction.type === 'debit'
+  const isTagged = !!transaction.categoryId
+
   return (
-    <div 
-      onClick={() => onClick?.(transaction)}
-      className="bg-card border-2 border-secondary/50 rounded-4xl p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-    >
+    <div onClick={() => onClick?.(transaction)} className="bg-card border-2 border-secondary/50 rounded-4xl p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">
-          {isTagged && (
-            <div className="h-11 w-11 rounded-2xl bg-secondary/50 flex items-center justify-center text-xl shrink-0 border border-border/50">
-              {transaction.categoryId?.emoji || "💰"}
-            </div>
-          )}
+          {isTagged && <div className="h-11 w-11 rounded-2xl bg-secondary/50 flex items-center justify-center text-xl shrink-0 border border-border/50">{transaction.categoryId?.emoji || '💰'}</div>}
           <div className="space-y-0.5 min-w-0">
-            <p className="text-sm font-black text-muted-foreground truncate uppercase tracking-tight leading-tight">
-              {transaction.newDescription || transaction.originalDescription}
-            </p>
-            <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">
-              {transaction.accountId?.title}
-            </p>
+            <p className="text-sm font-black text-muted-foreground truncate uppercase tracking-tight leading-tight">{transaction.newDescription || transaction.originalDescription}</p>
+            <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">{transaction.accountId?.title}</p>
           </div>
         </div>
-        <span className={`text-lg font-black whitespace-nowrap ${isDebit ? 'text-primary' : 'text-emerald-500'}`}>
-          ₹{transaction.originalAmount.toLocaleString('en-IN')}
-        </span>
+        <span className={`text-lg font-black whitespace-nowrap ${isDebit ? 'text-primary' : 'text-emerald-500'}`}>₹{transaction.originalAmount.toLocaleString('en-IN')}</span>
       </div>
-      
+
       {!isTagged && (
-        <Button 
-          variant="secondary" 
+        <Button
+          variant="secondary"
           onClick={(e) => {
-            e.stopPropagation();
-            onTagClick?.(transaction);
+            e.stopPropagation()
+            onTagClick?.(transaction)
           }}
           className="h-9 px-4 rounded-xl bg-primary/80 text-primary-foreground font-black text-[10px] hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 active:scale-95 flex items-center gap-1.5 border-none"
         >
@@ -56,5 +43,5 @@ export const TransactionItem = ({ transaction, onClick, onTagClick }: Transactio
         </Button>
       )}
     </div>
-  );
-};
+  )
+}
