@@ -109,9 +109,10 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
               // Create transaction
               await createTransaction({
                 accountId: account._id,
+                domainId: domain._id,
                 userId,
-                date: transactionDate,
-                description,
+                originalDate: transactionDate,
+                originalDescription: description,
                 originalAmount: amount,
                 type,
               });

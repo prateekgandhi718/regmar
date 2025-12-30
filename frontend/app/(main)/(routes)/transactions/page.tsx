@@ -11,17 +11,28 @@ import { useMemo, useState } from "react";
 import { TransactionItem } from "./_components/tagged-transaction-item";
 import { formatAmount } from "@/lib/utils";
 import { QuickTagDrawer } from "./_components/quick-tag-drawer";
+import { TransactionDetailDrawer } from "./_components/transaction-detail-drawer";
 
 const TransactionsPage = () => {
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery();
   const { data: transactions, isLoading: isLoadingTransactions } = useGetTransactionsQuery();
   
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isQuickTagOpen, setIsQuickTagOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const handleTagClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
-    setIsDrawerOpen(true);
+    setIsQuickTagOpen(true);
+  };
+
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    if (transaction.categoryId) {
+      setIsDetailOpen(true);
+    } else {
+      setIsQuickTagOpen(true);
+    }
   };
 
   const isEmailLinked = linkedAccounts && linkedAccounts.some(acc => acc.isActive);
@@ -29,6 +40,13 @@ const TransactionsPage = () => {
   // Group transactions by Month/Year and then by Day
   const groupedTransactions = useMemo(() => {
     if (!transactions) return [];
+
+    // Sort transactions by effective date descending
+    const sortedTxs = [...transactions].sort((a, b) => {
+      const dateA = new Date(a.newDate || a.originalDate).getTime();
+      const dateB = new Date(b.newDate || b.originalDate).getTime();
+      return dateB - dateA;
+    });
 
     interface DayGroup {
       date: Date;
@@ -44,8 +62,8 @@ const TransactionsPage = () => {
 
     const monthGroups: MonthGroup[] = [];
 
-    transactions.forEach(tx => {
-      const date = parseISO(tx.date);
+    sortedTxs.forEach(tx => {
+      const date = parseISO(tx.newDate || tx.originalDate);
       const monthYear = format(date, "MMM yyyy").toUpperCase();
       
       let monthGroup = monthGroups.find(g => g.monthYear === monthYear);
@@ -56,8 +74,6 @@ const TransactionsPage = () => {
 
       if (tx.type === 'debit') {
         monthGroup.total += tx.originalAmount;
-      } else {
-        monthGroup.total -= tx.originalAmount;
       }
 
       let dayGroup = monthGroup.days.find(d => isSameDay(d.date, date));
@@ -68,8 +84,6 @@ const TransactionsPage = () => {
 
       if (tx.type === 'debit') {
         dayGroup.total += tx.originalAmount;
-      } else {
-        dayGroup.total -= tx.originalAmount;
       }
       dayGroup.transactions.push(tx);
     });
@@ -144,8 +158,8 @@ const TransactionsPage = () => {
         <div key={group.monthYear} className="space-y-6">
           <div className="flex items-center justify-between border-b pb-4 border-border/50">
             <h2 className="text-sm font-black text-muted-foreground uppercase tracking-widest">{group.monthYear}</h2>
-            <span className={`text-sm font-black tracking-tight ${group.total > 0 ? 'text-primary/80' : 'text-emerald-500'}`}>
-              {group.total > 0 ? '-' : group.total < 0 ? '+' : ''}₹{formatAmount(Math.abs(group.total))}
+            <span className="text-sm font-black tracking-tight text-primary/80">
+              {group.total > 0 && "-"}₹{formatAmount(group.total)}
             </span>
           </div>
 
@@ -153,8 +167,8 @@ const TransactionsPage = () => {
             <div key={day.date.toISOString()} className="space-y-4">
               <div className="flex items-center justify-between px-2">
                 <span className="text-xs font-bold text-muted-foreground">{format(day.date, "EEEE, MMM d")}</span>
-                <span className={`text-xs font-black ${day.total > 0 ? 'text-muted-foreground' : 'text-emerald-500'}`}>
-                  {day.total > 0 ? '-' : day.total < 0 ? '+' : ''}₹{Math.abs(day.total).toLocaleString('en-IN')}
+                <span className="text-xs font-black text-muted-foreground">
+                  {day.total > 0 && "-"}₹{day.total.toLocaleString('en-IN')}
                 </span>
               </div>
 
@@ -163,6 +177,7 @@ const TransactionsPage = () => {
                   <div key={tx._id} className="group transition-all">
                     <TransactionItem 
                       transaction={tx} 
+                      onClick={handleTransactionClick}
                       onTagClick={handleTagClick}
                     />
                   </div>
@@ -175,8 +190,14 @@ const TransactionsPage = () => {
 
       <QuickTagDrawer 
         transaction={selectedTransaction}
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
+        isOpen={isQuickTagOpen}
+        onClose={() => setIsQuickTagOpen(false)}
+      />
+
+      <TransactionDetailDrawer
+        transaction={selectedTransaction}
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
       />
     </div>
   );
