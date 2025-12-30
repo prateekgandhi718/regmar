@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, CreditCard, Plane, Settings, Wallet} from 'lucide-react'
+import { Home, CreditCard, TrendingUp, Settings, Wallet} from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -21,9 +21,9 @@ const BottomNavbar = () => {
       href: '/transactions',
     },
     {
-      label: 'Travels',
-      icon: Plane,
-      href: '/travels',
+      label: 'Investments',
+      icon: TrendingUp,
+      href: '/investments',
     },
     {
       label: 'Accounts',

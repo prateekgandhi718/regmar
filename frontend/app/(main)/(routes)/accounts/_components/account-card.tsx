@@ -8,12 +8,14 @@ interface AccountCardProps {
   accountNumber?: string;
   domainName?: string;
   className?: string;
+  currency?: string;
 }
 
 export const AccountCard = ({
   title,
   accountNumber,
   domainName,
+  currency,
   className,
 }: AccountCardProps) => {
   const extractedDomain = domainName?.split("@").pop();
@@ -45,7 +47,7 @@ export const AccountCard = ({
             </p>
           )}
           <p className="text-[8px] font-bold opacity-60 uppercase tracking-tighter">
-            Synced
+            {currency}
           </p>
         </div>
         <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-lg border border-white/20">
