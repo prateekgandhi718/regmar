@@ -38,12 +38,22 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
         const syncState = await getSyncState(userId, domain._id.toString());
         const lastUid = syncState?.lastUid || 0;
 
+        let since: Date | undefined;
+        if (lastUid === 0) {
+          since = new Date();
+          since.setDate(1); // 1st of current month
+          since.setHours(0, 0, 0, 0);
+          console.log(`Initial sync for domain ${domain.fromEmail}. Fetching all emails since ${since.toISOString()}`);
+        }
+
         // 4. Fetch new emails
         const { emails, lastUid: newLastUid } = await fetchEmailsIncrementally(
           email,
           appPassword,
           domain.fromEmail,
-          lastUid
+          lastUid,
+          undefined, // No limit for sync - fetch everything
+          since
         );
 
         if (emails.length === 0) continue;
@@ -62,64 +72,67 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
             const regexDoc = await getRegexById(regexId.toString());
             if (!regexDoc) continue;
 
-            const amountRegex = new RegExp(regexDoc.amountRegex, 'i');
-            const descriptionRegex = new RegExp(regexDoc.descriptionRegex, 'i');
-            
-            const amountMatch = content.match(amountRegex);
-            const descMatch = content.match(descriptionRegex);
-
-            if (!amountMatch) {
-              console.log(`[Domain: ${domain.fromEmail}] Amount regex failed. Pattern: ${regexDoc.amountRegex}`);
-            }
-            if (!descMatch) {
-              console.log(`[Domain: ${domain.fromEmail}] Description regex failed. Pattern: ${regexDoc.descriptionRegex}`);
-            }
-
-            if (amountMatch && descMatch) {
-              const amountStr = amountMatch[1].replace(/,/g, '');
-              const amount = parseFloat(amountStr);
-              const description = descMatch[1].trim();
+            try {
+              const amountRegex = new RegExp(regexDoc.amountRegex, 'i');
+              const descriptionRegex = new RegExp(regexDoc.descriptionRegex, 'i');
               
-              // Extract date if regex provided, otherwise fallback to email date
-              let transactionDate = date;
-              if (regexDoc.dateRegex) {
-                const dateRegex = new RegExp(regexDoc.dateRegex, 'i');
-                const dateMatch = content.match(dateRegex);
-                if (dateMatch) {
-                  const parsedDate = new Date(dateMatch[1]);
-                  if (!isNaN(parsedDate.getTime())) {
-                    transactionDate = parsedDate;
+              const amountMatch = content.match(amountRegex);
+              const descMatch = content.match(descriptionRegex);
+
+              if (!amountMatch) {
+                console.log(`[Domain: ${domain.fromEmail}] Amount regex failed. Pattern: ${regexDoc.amountRegex}`);
+              }
+              if (!descMatch) {
+                console.log(`[Domain: ${domain.fromEmail}] Description regex failed. Pattern: ${regexDoc.descriptionRegex}`);
+              }
+
+              if (amountMatch && descMatch) {
+                const amountStr = amountMatch[1].replace(/,/g, '');
+                const amount = parseFloat(amountStr);
+                // Clean description: trim, collapse spaces, and remove common trailing structural words
+                const description = descMatch[1]
+                  .replace(/\s+/g, ' ')
+                  .replace(/\s+(?:If this|on|at|from|by|at|for)\s*$/i, '')
+                  .trim();
+                
+                // We always use the date of the email as the transaction date
+                const transactionDate = date;
+
+                // Simple heuristic for type if not provided by regex
+                let type = 'debit';
+                if (regexDoc.creditRegex) {
+                  try {
+                    const creditRegex = new RegExp(regexDoc.creditRegex, 'i');
+                    const isCredit = creditRegex.test(content);
+                    console.log(`[Domain: ${domain.fromEmail}] Credit regex test: ${isCredit} (Pattern: ${regexDoc.creditRegex})`);
+                    if (isCredit) {
+                      type = 'credit';
+                    }
+                  } catch (e) {
+                    console.error(`[Domain: ${domain.fromEmail}] Invalid creditRegex: ${regexDoc.creditRegex}`);
                   }
                 }
+
+                console.log(`Synced: ${type} of ${amount} at ${description} on ${transactionDate}`);
+
+                // Create transaction
+                await createTransaction({
+                  accountId: account._id,
+                  domainId: domain._id,
+                  userId,
+                  originalDate: transactionDate,
+                  originalDescription: description,
+                  originalAmount: amount,
+                  type,
+                });
+
+                totalSynced++;
+                wasParsed = true;
+                break; // Stop at first working regex for this email
               }
-
-              // Simple heuristic for type if not provided by regex
-              let type = 'debit';
-              if (regexDoc.creditRegex) {
-                const creditRegex = new RegExp(regexDoc.creditRegex, 'i');
-                const isCredit = creditRegex.test(content);
-                console.log(`[Domain: ${domain.fromEmail}] Credit regex test: ${isCredit} (Pattern: ${regexDoc.creditRegex})`);
-                if (isCredit) {
-                  type = 'credit';
-                }
-              }
-
-              console.log(`Synced: ${type} of ${amount} at ${description} on ${transactionDate}`);
-
-              // Create transaction
-              await createTransaction({
-                accountId: account._id,
-                domainId: domain._id,
-                userId,
-                originalDate: transactionDate,
-                originalDescription: description,
-                originalAmount: amount,
-                type,
-              });
-
-              totalSynced++;
-              wasParsed = true;
-              break; // Stop at first working regex for this email
+            } catch (error: any) {
+              console.error(`[Domain: ${domain.fromEmail}] Regex error for pattern ${regexId}:`, error.message);
+              continue; // Try next regex
             }
           }
 

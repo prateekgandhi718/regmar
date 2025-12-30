@@ -14,3 +14,5 @@ export const SyncStateModel = mongoose.model('SyncState', SyncStateSchema);
 export const getSyncState = (userId: string, domainId: string) => SyncStateModel.findOne({ userId, domainId });
 export const updateSyncState = (userId: string, domainId: string, lastUid: number) => 
   SyncStateModel.findOneAndUpdate({ userId, domainId }, { lastUid }, { upsert: true, new: true });
+export const deleteSyncStatesByDomainId = (domainId: string) => SyncStateModel.deleteMany({ domainId });
+export const deleteSyncStatesByUserId = (userId: string) => SyncStateModel.deleteMany({ userId });

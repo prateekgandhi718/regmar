@@ -72,7 +72,12 @@ const TransactionsPage = () => {
         monthGroups.push(monthGroup);
       }
 
-      if (tx.type === 'debit') {
+      const isExcludedFromDebitTotal = tx.categoryId && (
+        tx.categoryId.name === 'Self Transfer' || 
+        tx.categoryId.name === 'Investment'
+      );
+
+      if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
         monthGroup.total += tx.originalAmount;
       }
 
@@ -82,7 +87,7 @@ const TransactionsPage = () => {
         monthGroup.days.push(dayGroup);
       }
 
-      if (tx.type === 'debit') {
+      if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
         dayGroup.total += tx.originalAmount;
       }
       dayGroup.transactions.push(tx);

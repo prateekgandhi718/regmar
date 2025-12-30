@@ -32,8 +32,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <div className="h-full dark:bg-dark-bg">
-      <main className="h-full pb-16">{children}</main>
+    <div className="min-h-screen dark:bg-dark-bg">
+      <main className="min-h-screen pb-20">{children}</main>
       <BottomNavbar />
     </div>
   )
