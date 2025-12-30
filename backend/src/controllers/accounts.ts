@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs";
+import path from "path";
 import {
   getAccountsByUserId,
   createAccount,
@@ -8,20 +10,53 @@ import {
 } from "../db/accountModel";
 import {
   createDomain,
+  getDomainsByAccountId,
   deleteDomainById,
   deleteDomainsByAccountId,
+  DomainModel,
 } from "../db/domainModel";
 import {
   getRegexesByDomain,
   createRegex,
   updateRegexByDomain,
+  deleteRegexById,
 } from "../db/regexModel";
 import { deleteTransactionsByAccountId } from "../db/transactionModel";
 import { getActiveLinkedAccountByUserId } from "../db/linkedAccountModel";
+import { deleteSyncStatesByDomainId } from "../db/syncStateModel";
 import { decrypt } from "../helpers/encryption";
-import { fetchSampleEmails } from "../helpers/imap";
+import { fetchDiverseSamples } from "../helpers/imap";
 import { generateRegexFromEmailInternal } from "./ai";
 import { AuthRequest } from "../middlewares/auth";
+
+/**
+ * Helper to clean up a single domain and its related data (sync state, regexes if unused)
+ */
+const cleanupDomain = async (userId: string, domainId: string) => {
+  const domain = await DomainModel.findById(domainId);
+  if (!domain) return;
+
+  const regexIds = domain.regexIds.map((rid: any) => rid.toString());
+
+  // 1. Delete sync state
+  await deleteSyncStatesByDomainId(domainId);
+
+  // 2. Delete domain document
+  await deleteDomainById(domainId);
+
+  // 3. Clean up regexes if not used by any other domain for this user
+  for (const rid of regexIds) {
+    const isStillUsed = await DomainModel.findOne({
+      userId,
+      regexIds: rid,
+    });
+
+    if (!isStillUsed) {
+      console.log(`Regex ${rid} is no longer used by any domain for user ${userId}. Deleting...`);
+      await deleteRegexById(rid);
+    }
+  }
+};
 
 /**
  * Helper to process domains for an account:
@@ -43,47 +78,70 @@ const processAccountDomains = async (
     if (!fromEmail.trim()) continue;
 
     const emailDomain = fromEmail.trim();
-    const existingRegexes = await getRegexesByDomain(emailDomain);
+    const existingRegexes = await getRegexesByDomain(userId, emailDomain);
+    let regexIds: string[] = existingRegexes.map((r) => r._id.toString());
 
-    console.log(
-      `Found ${existingRegexes.length} existing regex patterns for ${emailDomain}. Fetching samples to verify...`
-    );
+    if (regexIds.length === 0) {
+      console.log(`No existing regex patterns for ${emailDomain}. Fetching diverse samples for AI...`);
 
-    const sampleEmails = await fetchSampleEmails(
-      linkedAccount.email,
-      appPassword,
-      emailDomain,
-      5
-    );
+      // BUCKET SAMPLING LOGIC
+      const debitKeywords = ["debited", "spent", "paid", "transaction", "payment", "used", "withdrawn"];
+      const creditKeywords = ["credited", "received", "deposited", "added", "refunded"];
 
-    console.log(`Fetched ${sampleEmails.length} samples for ${fromEmail}`);
-
-    // Filter out samples already matched by existing regexes
-    const unmatchedSamples = sampleEmails.filter((sample) => {
-      const isMatched = existingRegexes.some((regex) => {
-        const amountRegex = new RegExp(regex.amountRegex, "i");
-        const descriptionRegex = new RegExp(regex.descriptionRegex, "i");
-        return amountRegex.test(sample) && descriptionRegex.test(sample);
-      });
-      return !isMatched;
-    });
-
-    const regexIds: string[] = existingRegexes.map((r) => r._id.toString());
-
-    if (unmatchedSamples.length > 0) {
-      console.log(
-        `${unmatchedSamples.length}/${sampleEmails.length} samples unmatched. Generating new patterns via AI...`
+      // Fetch all buckets using a single connection to avoid "System Error (Failure)"
+      const { debitBuckets, creditBuckets } = await fetchDiverseSamples(
+        linkedAccount.email,
+        appPassword,
+        emailDomain,
+        debitKeywords,
+        creditKeywords
       );
 
-      // Log unmatched for debugging
-      unmatchedSamples.forEach((sample, i) => {
-        console.log(
-          `--- Unmatched Sample ${i + 1} ---\n${sample}\n-------------------------`
-        );
+      // Log bucket-wise samples for debugging
+      const logDir = path.join(process.cwd(), "logs");
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir);
+      }
+      const logFilePath = path.join(logDir, "email-samples.log");
+      let logData = `\n--- BUCKET SAMPLES FOR ${emailDomain} [${new Date().toISOString()}] ---\n`;
+      
+      logData += `\n[DEBIT BUCKET]\n`;
+      debitKeywords.forEach((kw, i) => {
+        const samples = debitBuckets[i];
+        if (samples.length > 0) {
+          logData += `Keyword "${kw}": ${samples.length} samples\n`;
+          samples.forEach((s, j) => {
+            logData += `  ${j+1}: ${s.replace(/\n/g, ' ')}\n`;
+          });
+        }
       });
 
+      logData += `\n[CREDIT BUCKET]\n`;
+      creditKeywords.forEach((kw, i) => {
+        const samples = creditBuckets[i];
+        if (samples.length > 0) {
+          logData += `Keyword "${kw}": ${samples.length} samples\n`;
+          samples.forEach((s, j) => {
+            logData += `  ${j+1}: ${s.replace(/\n/g, ' ')}\n`;
+          });
+        }
+      });
+
+      logData += `\n--- END SAMPLES ---\n`;
+      
+      fs.appendFileSync(logFilePath, logData);
+      console.log(`Diverse samples collected and logged to ${logFilePath}`);
+
+      // Flatten and deduplicate
+      const allSamples = [...new Set([
+        ...debitBuckets.flat(),
+        ...creditBuckets.flat()
+      ])].slice(0, 20);
+
+      console.log(`Collected ${allSamples.length} diverse samples for AI generation.`);
+
       const aiResult = await generateRegexFromEmailInternal(
-        unmatchedSamples,
+        allSamples,
         emailDomain
       );
 
@@ -93,27 +151,38 @@ const processAccountDomains = async (
         for (const pattern of aiResult.patterns) {
           if (!pattern.amountRegex || !pattern.descriptionRegex) continue;
 
+          // Programmatic safety net: Strip inline flags like (?i) or (?m) if AI ignored prompt
+          const cleanRegex = (str: string) => str.replace(/\(\?[imsguy]+\)/g, "").trim();
+
+          const sanitizedPattern = {
+            amountRegex: cleanRegex(pattern.amountRegex),
+            descriptionRegex: cleanRegex(pattern.descriptionRegex),
+            accountNumberRegex: pattern.accountNumberRegex ? cleanRegex(pattern.accountNumberRegex) : undefined,
+            creditRegex: pattern.creditRegex ? cleanRegex(pattern.creditRegex) : undefined,
+          };
+
           // Final safety check: ignore patterns that look like Gemini explanations or balance-only detections
           const invalidMarkers = ["n/a", "none", "balance alert", "no transaction", "balance update"];
           const isInvalid = invalidMarkers.some(marker => 
-            pattern.descriptionRegex.toLowerCase().includes(marker) || 
-            (pattern.creditRegex && pattern.creditRegex.toLowerCase().includes(marker))
+            sanitizedPattern.descriptionRegex.toLowerCase().includes(marker) || 
+            (sanitizedPattern.creditRegex && sanitizedPattern.creditRegex.toLowerCase().includes(marker))
           );
 
           if (isInvalid) {
-            console.log(`Skipping invalid/placeholder pattern generated for ${fromEmail}: ${pattern.descriptionRegex}`);
+            console.log(`Skipping invalid/placeholder pattern generated for ${fromEmail}: ${sanitizedPattern.descriptionRegex}`);
             continue;
           }
 
           const regexDoc = await createRegex({
+            userId,
             domain: emailDomain,
-            ...pattern,
+            ...sanitizedPattern,
           });
           regexIds.push(regexDoc._id.toString());
         }
-        
-        console.log(`Valid patterns extracted: ${regexIds.length - existingRegexes.length}`);
       }
+    } else {
+      console.log(`Found ${regexIds.length} existing regex patterns for ${emailDomain}. Using them directly.`);
     }
 
     if (regexIds.length === 0) {
@@ -233,7 +302,7 @@ export const updateAccount = async (
       // For updates, we replace existing domains
       if (existingAccount.domainIds) {
         for (const domainId of existingAccount.domainIds) {
-          await deleteDomainById(domainId.toString());
+          await cleanupDomain(userId, domainId.toString());
         }
       }
 
@@ -259,14 +328,28 @@ export const deleteAccount = async (
 ) => {
   try {
     const { id } = req.params;
-    await deleteDomainsByAccountId(id);
+    const userId = req.userId;
+    if (!userId) return res.sendStatus(401);
+
+    // 1. Get all domains for this account
+    const domains = await getDomainsByAccountId(id);
+
+    // 2. Clean up each domain
+    for (const domain of domains) {
+      await cleanupDomain(userId, domain._id.toString());
+    }
+
+    // 3. Delete all transactions for this account
     await deleteTransactionsByAccountId(id);
+
+    // 4. Delete the account itself
     await deleteAccountById(id);
+
     return res.status(200).json({
       message: "Account and all associated data deleted successfully",
     });
   } catch (error) {
-    console.error(error);
-    return res.sendStatus(400);
+    console.error("Error during account deletion:", error);
+    return res.status(400).json({ message: "Failed to delete account and associated data" });
   }
 };

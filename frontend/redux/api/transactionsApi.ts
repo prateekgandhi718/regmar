@@ -6,11 +6,18 @@ export interface Transaction {
   accountId: {
     _id: string;
     title: string;
+    accountNumber: string;
     icon?: string;
+    domainIds: {
+      _id: string;
+      fromEmail: string;
+    }[];
   };
   userId: string;
-  date: string;
-  description: string;
+  originalDate: string;
+  newDate?: string;
+  originalDescription: string;
+  newDescription?: string;
   originalAmount: number;
   newAmount?: number;
   type: 'credit' | 'debit';
@@ -34,16 +41,23 @@ export const transactionsApi = createApi({
       query: () => "/transactions",
       providesTags: ["Transaction"],
     }),
-    tagTransaction: builder.mutation<Transaction, { id: string; categoryId: string }>({
-      query: ({ id, categoryId }) => ({
-        url: `/transactions/${id}/tag`,
+    updateTransaction: builder.mutation<Transaction, { id: string; [key: string]: string | number | boolean | undefined | null }>({
+      query: ({ id, ...body }) => ({
+        url: `/transactions/${id}`,
         method: "PATCH",
-        body: { categoryId },
+        body,
+      }),
+      invalidatesTags: ["Transaction"],
+    }),
+    deleteTransaction: builder.mutation<{ message: string }, string>({
+      query: (id) => ({
+        url: `/transactions/${id}`,
+        method: "DELETE",
       }),
       invalidatesTags: ["Transaction"],
     }),
   }),
 });
 
-export const { useGetTransactionsQuery, useTagTransactionMutation } = transactionsApi;
+export const { useGetTransactionsQuery, useUpdateTransactionMutation, useDeleteTransactionMutation } = transactionsApi;
 

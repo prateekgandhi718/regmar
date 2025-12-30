@@ -6,15 +6,19 @@ import { Plus } from "lucide-react";
 
 interface TransactionItemProps {
   transaction: Transaction;
+  onClick?: (transaction: Transaction) => void;
   onTagClick?: (transaction: Transaction) => void;
 }
 
-export const TransactionItem = ({ transaction, onTagClick }: TransactionItemProps) => {
+export const TransactionItem = ({ transaction, onClick, onTagClick }: TransactionItemProps) => {
   const isDebit = transaction.type === "debit";
   const isTagged = !!transaction.categoryId;
   
   return (
-    <div className="bg-card border-2 border-secondary/50 rounded-4xl p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow">
+    <div 
+      onClick={() => onClick?.(transaction)}
+      className="bg-card border-2 border-secondary/50 rounded-4xl p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">
           {isTagged && (
@@ -24,7 +28,7 @@ export const TransactionItem = ({ transaction, onTagClick }: TransactionItemProp
           )}
           <div className="space-y-0.5 min-w-0">
             <p className="text-sm font-black text-muted-foreground truncate uppercase tracking-tight leading-tight">
-              {transaction.description}
+              {transaction.newDescription || transaction.originalDescription}
             </p>
             <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">
               {transaction.accountId?.title}
@@ -39,7 +43,10 @@ export const TransactionItem = ({ transaction, onTagClick }: TransactionItemProp
       {!isTagged && (
         <Button 
           variant="secondary" 
-          onClick={() => onTagClick?.(transaction)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTagClick?.(transaction);
+          }}
           className="h-9 px-4 rounded-xl bg-primary/80 text-primary-foreground font-black text-[10px] hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 active:scale-95 flex items-center gap-1.5 border-none"
         >
           <div className="bg-white rounded-full">

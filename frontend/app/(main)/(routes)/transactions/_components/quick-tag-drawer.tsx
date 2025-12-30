@@ -3,7 +3,7 @@
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
 import { Transaction } from "@/redux/api/transactionsApi";
 import { useGetCategoriesQuery } from "@/redux/api/categoriesApi";
-import { useTagTransactionMutation } from "@/redux/api/transactionsApi";
+import { useUpdateTransactionMutation } from "@/redux/api/transactionsApi";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,16 +17,16 @@ interface QuickTagDrawerProps {
 
 export const QuickTagDrawer = ({ transaction, isOpen, onClose }: QuickTagDrawerProps) => {
   const { data: categories, isLoading: isLoadingCategories } = useGetCategoriesQuery();
-  const [tagTransaction, { isLoading: isTagging }] = useTagTransactionMutation();
+  const [updateTransaction, { isLoading: isTagging }] = useUpdateTransactionMutation();
 
   if (!transaction) return null;
 
   const handleSelectCategory = async (categoryId: string) => {
     try {
-      await tagTransaction({ id: transaction._id, categoryId }).unwrap();
+      await updateTransaction({ id: transaction._id, categoryId }).unwrap();
       toast.success("Transaction tagged successfully");
       onClose();
-    } catch (error) {
+    } catch {
       toast.error("Failed to tag transaction");
     }
   };
@@ -49,10 +49,7 @@ export const QuickTagDrawer = ({ transaction, isOpen, onClose }: QuickTagDrawerP
             <div className="flex justify-between items-start mb-2 gap-4">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-black text-foreground uppercase tracking-tight truncate leading-tight">
-                  {transaction.description}
-                </p>
-                <p className="text-xs font-black text-foreground/80 uppercase tracking-tight mt-1">
-                  PRATEEK GANDHI
+                  {transaction.newDescription || transaction.originalDescription}
                 </p>
               </div>
               <span className={`text-lg font-black whitespace-nowrap ${transaction.type === 'debit' ? 'text-primary' : 'text-emerald-500'}`}>
@@ -60,7 +57,7 @@ export const QuickTagDrawer = ({ transaction, isOpen, onClose }: QuickTagDrawerP
               </span>
             </div>
             <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest mt-2">
-              {format(new Date(transaction.date), "dd MMM 'yy")} • {transaction.accountId?.title}
+              {format(new Date(transaction.newDate || transaction.originalDate), "dd MMM yy")} • {transaction.accountId?.title} • {transaction.accountId?.accountNumber}
             </p>
           </div>
 

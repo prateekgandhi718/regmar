@@ -12,7 +12,9 @@ export const fetchEmailsIncrementally = async (
   appPassword: string,
   fromEmail: string,
   lastUid: number = 0,
-  limit: number = 5
+  limit?: number,
+  since?: Date,
+  keyword?: string
 ): Promise<FetchResult> => {
   const client = new ImapFlow({
     host: 'imap.gmail.com',
@@ -37,6 +39,12 @@ export const fetchEmailsIncrementally = async (
       const searchCriteria: any = { from: fromEmail };
       if (lastUid > 0) {
         searchCriteria.uid = `${lastUid + 1}:*`;
+      } else if (since) {
+        searchCriteria.since = since;
+      }
+
+      if (keyword) {
+        searchCriteria.body = keyword;
       }
 
       const messages = await client.search(searchCriteria);
@@ -44,8 +52,8 @@ export const fetchEmailsIncrementally = async (
       // search returns sequence numbers.
       let targetSeqs: number[] = Array.isArray(messages) ? messages : [];
       
-      // If we are starting fresh (lastUid === 0), we only want the latest 'limit' emails
-      if (lastUid === 0 && targetSeqs.length > limit) {
+      // Apply limit only if explicitly provided (e.g. for fetching samples)
+      if (limit && targetSeqs.length > limit) {
         targetSeqs = targetSeqs.slice(-limit);
       }
 
@@ -75,8 +83,14 @@ export const fetchEmailsIncrementally = async (
             const date = message.envelope?.date || parsed.date || new Date();
             
             if (content) {
+              // Aggressively clean whitespace and structural junk
+              const cleanedContent = content
+                .replace(/\s+/g, ' ')
+                .replace(/\uFFFD/g, '')
+                .trim();
+
               emails.push({ 
-                content: content.trim(), 
+                content: cleanedContent, 
                 date, 
                 uid: message.uid 
               });
@@ -104,12 +118,92 @@ export const fetchEmailsIncrementally = async (
   return { emails, lastUid: newLastUid };
 };
 
-export const fetchSampleEmails = async (
+export const fetchDiverseSamples = async (
   email: string,
   appPassword: string,
   fromEmail: string,
-  limit: number = 5
-): Promise<string[]> => {
-  const { emails } = await fetchEmailsIncrementally(email, appPassword, fromEmail, 0, limit);
-  return emails.map(e => e.content);
+  debitKeywords: string[],
+  creditKeywords: string[]
+): Promise<{ debitBuckets: string[][], creditBuckets: string[][] }> => {
+  const client = new ImapFlow({
+    host: 'imap.gmail.com',
+    port: 993,
+    secure: true,
+    auth: {
+      user: email,
+      pass: appPassword,
+    },
+    logger: false,
+  });
+
+  const debitBuckets: string[][] = [];
+  const creditBuckets: string[][] = [];
+
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX');
+
+    try {
+      const fetchBody = async (searchCriteria: any, limit: number): Promise<string[]> => {
+        const messages = await client.search(searchCriteria);
+        let targetSeqs: number[] = Array.isArray(messages) ? messages : [];
+        if (limit && targetSeqs.length > limit) {
+          targetSeqs = targetSeqs.slice(-limit);
+        }
+
+        const contents: string[] = [];
+        for (const seq of targetSeqs) {
+          const message = await client.fetchOne(seq.toString(), { source: true });
+          if (message && message.source) {
+            const parsed = await simpleParser(message.source);
+            let content = '';
+            if (parsed.text) {
+              content = parsed.text;
+            } else if (parsed.html) {
+              content = convert(parsed.html as string, {
+                wordwrap: false,
+                selectors: [
+                  { selector: 'a', options: { ignoreHref: true } },
+                  { selector: 'img', format: 'skip' }
+                ]
+              });
+            } else if (parsed.textAsHtml) {
+              content = convert(parsed.textAsHtml as string, { wordwrap: false });
+            }
+            if (content) {
+              // Aggressively clean whitespace and structural junk
+              const cleanedContent = content
+                .replace(/\s+/g, ' ')
+                .replace(/\uFFFD/g, '')
+                .trim();
+              if (cleanedContent) contents.push(cleanedContent);
+            }
+          }
+        }
+        return contents;
+      };
+
+      // 1. Fetch Debit Buckets
+      for (const kw of debitKeywords) {
+        const samples = await fetchBody({ from: fromEmail, body: kw }, 3);
+        debitBuckets.push(samples);
+      }
+
+      // 2. Fetch Credit Buckets
+      for (const kw of creditKeywords) {
+        const samples = await fetchBody({ from: fromEmail, body: kw }, 3);
+        creditBuckets.push(samples);
+      }
+
+    } finally {
+      lock.release();
+    }
+    await client.logout();
+  } catch (error) {
+    console.error(`Diverse IMAP fetch error for ${email}:`, error);
+    try { await client.logout(); } catch (e) {}
+    throw error;
+  }
+
+  return { debitBuckets, creditBuckets };
 };

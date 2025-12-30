@@ -6,6 +6,7 @@ import { AccountCard } from "./_components/account-card";
 import { AddAccountDrawer } from "./_components/add-account-drawer";
 import { useGetAccountsQuery, Account } from "@/redux/api/accountsApi";
 import { Loader2 } from "lucide-react";
+import { SetupPrompts } from "@/components/setup-prompts";
 
 const AccountsPage = () => {
   const [search, setSearch] = useState("");
@@ -42,6 +43,7 @@ const AccountsPage = () => {
       />
       
       <div className="flex-1 px-4 mt-6 space-y-6 overflow-y-auto">
+        <SetupPrompts />
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -58,6 +60,7 @@ const AccountsPage = () => {
                   title={account.title}
                   accountNumber={account.accountNumber}
                   domainName={account.domainIds?.[0]?.fromEmail}
+                  currency={account.currency}
                 />
               </div>
             ))}

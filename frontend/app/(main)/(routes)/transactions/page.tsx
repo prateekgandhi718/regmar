@@ -2,26 +2,46 @@
 
 import { useGetLinkedAccountsQuery } from "@/redux/api/linkedAccountsApi";
 import { useGetTransactionsQuery, Transaction } from "@/redux/api/transactionsApi";
-import { AlertCircle, ArrowRight, ChevronDown } from "lucide-react";
-import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, parseISO, isSameDay } from "date-fns";
+import { format, parseISO, isSameDay, subDays, subMonths, isAfter } from "date-fns";
 import { useMemo, useState } from "react";
 import { TransactionItem } from "./_components/tagged-transaction-item";
 import { formatAmount } from "@/lib/utils";
 import { QuickTagDrawer } from "./_components/quick-tag-drawer";
+import { TransactionDetailDrawer } from "./_components/transaction-detail-drawer";
+import { TransactionSummary } from "./_components/transaction-summary";
+import { SetupPrompts } from "@/components/setup-prompts";
 
 const TransactionsPage = () => {
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery();
   const { data: transactions, isLoading: isLoadingTransactions } = useGetTransactionsQuery();
   
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedMonthYear, setSelectedMonthYear] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<"30d" | "6m" | "12m" | "all">("all");
+  const [isQuickTagOpen, setIsQuickTagOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const handleTagClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
-    setIsDrawerOpen(true);
+    setIsQuickTagOpen(true);
+  };
+
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    if (transaction.categoryId) {
+      setIsDetailOpen(true);
+    } else {
+      setIsQuickTagOpen(true);
+    }
   };
 
   const isEmailLinked = linkedAccounts && linkedAccounts.some(acc => acc.isActive);
@@ -29,6 +49,33 @@ const TransactionsPage = () => {
   // Group transactions by Month/Year and then by Day
   const groupedTransactions = useMemo(() => {
     if (!transactions) return [];
+
+    let filteredTxs = [...transactions];
+
+    // Date range filter
+    const now = new Date();
+    if (dateRange === "30d") {
+      const cutoff = subDays(now, 30);
+      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), cutoff));
+    } else if (dateRange === "6m") {
+      const cutoff = subMonths(now, 6);
+      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), cutoff));
+    } else if (dateRange === "12m") {
+      const cutoff = subMonths(now, 12);
+      filteredTxs = filteredTxs.filter(tx => isAfter(parseISO(tx.newDate || tx.originalDate), cutoff));
+    }
+
+    // Month specific filter
+    if (selectedMonthYear) {
+      filteredTxs = filteredTxs.filter(tx => format(parseISO(tx.newDate || tx.originalDate), "MMM yyyy").toUpperCase() === selectedMonthYear);
+    }
+
+    // Sort transactions by effective date descending
+    const sortedTxs = filteredTxs.sort((a, b) => {
+      const dateA = new Date(a.newDate || a.originalDate).getTime();
+      const dateB = new Date(b.newDate || b.originalDate).getTime();
+      return dateB - dateA;
+    });
 
     interface DayGroup {
       date: Date;
@@ -44,8 +91,8 @@ const TransactionsPage = () => {
 
     const monthGroups: MonthGroup[] = [];
 
-    transactions.forEach(tx => {
-      const date = parseISO(tx.date);
+    sortedTxs.forEach(tx => {
+      const date = parseISO(tx.newDate || tx.originalDate);
       const monthYear = format(date, "MMM yyyy").toUpperCase();
       
       let monthGroup = monthGroups.find(g => g.monthYear === monthYear);
@@ -54,10 +101,13 @@ const TransactionsPage = () => {
         monthGroups.push(monthGroup);
       }
 
-      if (tx.type === 'debit') {
-        monthGroup.total += tx.originalAmount;
-      } else {
-        monthGroup.total -= tx.originalAmount;
+      const isExcludedFromDebitTotal = tx.categoryId && (
+        tx.categoryId.name === 'Self Transfer' || 
+        tx.categoryId.name === 'Investment'
+      );
+
+      if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
+        monthGroup.total += tx.newAmount || tx.originalAmount;
       }
 
       let dayGroup = monthGroup.days.find(d => isSameDay(d.date, date));
@@ -66,16 +116,14 @@ const TransactionsPage = () => {
         monthGroup.days.push(dayGroup);
       }
 
-      if (tx.type === 'debit') {
-        dayGroup.total += tx.originalAmount;
-      } else {
-        dayGroup.total -= tx.originalAmount;
+      if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
+        dayGroup.total += tx.newAmount || tx.originalAmount;
       }
       dayGroup.transactions.push(tx);
     });
 
     return monthGroups;
-  }, [transactions]);
+  }, [transactions, selectedMonthYear, dateRange]);
 
   if (isLoadingLinked || isLoadingTransactions) {
     return (
@@ -95,38 +143,69 @@ const TransactionsPage = () => {
     <div className="p-6 space-y-8 pb-20">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black tracking-tight">Transactions</h1>
-        <Button variant="secondary" size="sm" className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4">
-          All Time <ChevronDown className="ml-1 h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          {selectedMonthYear && (
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="rounded-xl font-bold bg-orange-100 text-orange-600 border-none h-9 px-4 hover:bg-orange-200"
+              onClick={() => setSelectedMonthYear(null)}
+            >
+              {selectedMonthYear} <span className="ml-1 opacity-50">×</span>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4"
+              >
+                {dateRange === "30d" ? "Last 30 Days" : 
+                 dateRange === "6m" ? "Last 6 Months" : 
+                 dateRange === "12m" ? "Last 12 Months" : "All Time"}
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl p-2 border-border/50 shadow-xl">
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("30d")}
+              >
+                Last 30 Days
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("6m")}
+              >
+                Last 6 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("12m")}
+              >
+                Last 12 Months
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="rounded-xl font-bold cursor-pointer" 
+                onClick={() => setDateRange("all")}
+              >
+                All Time
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {!isEmailLinked && (
-        <div className="bg-orange-50 dark:bg-orange-500/5 border-2 border-orange-100 dark:border-orange-500/10 rounded-[2.5rem] p-8 space-y-4 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-            <AlertCircle className="h-32 w-32 text-orange-500" />
-          </div>
-          
-          <div className="space-y-2 relative z-10">
-            <h3 className="text-xl font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2">
-              <AlertCircle className="h-6 w-6" />
-              Email Not Linked
-            </h3>
-            <p className="text-orange-700 dark:text-orange-300 text-sm font-medium max-w-[85%] leading-relaxed">
-              To automatically fetch and display your transactions, please link your Gmail account in settings.
-            </p>
-          </div>
-          
-          <Button 
-            asChild
-            className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-12 px-8 font-black shadow-xl shadow-orange-500/20 active:scale-95 transition-all relative z-10"
-          >
-            <Link href="/settings" className="flex items-center gap-2">
-              Link Now
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+      {isEmailLinked && transactions && (
+        <TransactionSummary 
+          transactions={transactions}
+          selectedMonthYear={selectedMonthYear}
+          dateRange={dateRange}
+        />
       )}
+
+      <SetupPrompts />
 
       {isEmailLinked && groupedTransactions.length === 0 && (
         <div className="text-center py-32 space-y-6">
@@ -144,8 +223,8 @@ const TransactionsPage = () => {
         <div key={group.monthYear} className="space-y-6">
           <div className="flex items-center justify-between border-b pb-4 border-border/50">
             <h2 className="text-sm font-black text-muted-foreground uppercase tracking-widest">{group.monthYear}</h2>
-            <span className={`text-sm font-black tracking-tight ${group.total > 0 ? 'text-primary/80' : 'text-emerald-500'}`}>
-              {group.total > 0 ? '-' : group.total < 0 ? '+' : ''}₹{formatAmount(Math.abs(group.total))}
+            <span className="text-sm font-black tracking-tight text-primary/80">
+              {group.total > 0 && "-"}₹{formatAmount(group.total)}
             </span>
           </div>
 
@@ -153,8 +232,8 @@ const TransactionsPage = () => {
             <div key={day.date.toISOString()} className="space-y-4">
               <div className="flex items-center justify-between px-2">
                 <span className="text-xs font-bold text-muted-foreground">{format(day.date, "EEEE, MMM d")}</span>
-                <span className={`text-xs font-black ${day.total > 0 ? 'text-muted-foreground' : 'text-emerald-500'}`}>
-                  {day.total > 0 ? '-' : day.total < 0 ? '+' : ''}₹{Math.abs(day.total).toLocaleString('en-IN')}
+                <span className="text-xs font-black text-muted-foreground">
+                  {day.total > 0 && "-"}₹{day.total.toLocaleString('en-IN')}
                 </span>
               </div>
 
@@ -163,6 +242,7 @@ const TransactionsPage = () => {
                   <div key={tx._id} className="group transition-all">
                     <TransactionItem 
                       transaction={tx} 
+                      onClick={handleTransactionClick}
                       onTagClick={handleTagClick}
                     />
                   </div>
@@ -175,8 +255,14 @@ const TransactionsPage = () => {
 
       <QuickTagDrawer 
         transaction={selectedTransaction}
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
+        isOpen={isQuickTagOpen}
+        onClose={() => setIsQuickTagOpen(false)}
+      />
+
+      <TransactionDetailDrawer
+        transaction={selectedTransaction}
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
       />
     </div>
   );

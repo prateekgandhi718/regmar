@@ -21,8 +21,11 @@ export const generateRegexFromEmailInternal = async (emailBodies: string[], from
       You are an expert at pattern recognition and regex generation for banking notifications.
       Sender: "${fromEmail}"
 
+      CONTEXT:
+      I am providing you with a DIVERSE set of email samples (Debits and Credits).
+      
       GOAL:
-      Generate regex patterns to parse TRANSACTIONAL emails (debits/credits).
+      Generate robust regex patterns to parse these TRANSACTIONAL emails.
       
       Analyze these samples:
       ${combinedEmails}
@@ -31,39 +34,30 @@ export const generateRegexFromEmailInternal = async (emailBodies: string[], from
       - A transaction MUST involve money movement (spent, paid, received, credited, debited, transferred).
       - AN EMAIL THAT ONLY SHOWS "AVAILABLE BALANCE", "ACCOUNT BALANCE", OR "BALANCE UPDATE" IS NOT A TRANSACTION.
 
-      CRITICAL INSTRUCTIONS FOR BALANCE ALERTS:
-      - If a sample email ONLY describes an "available balance", "account balance", or "outstanding balance" WITHOUT a specific money movement event, YOU MUST IGNORE IT COMPLETELY.
-      - If ALL provided samples are just balance alerts, YOU MUST return an empty patterns array: {"patterns": []}.
-      - DO NOT return "N/A", "None", or any placeholder text in the regex fields. 
-      - DO NOT generate a pattern for an email if you cannot find a valid merchant/recipient name and a specific transaction amount that was moved.
+      CRITICAL INSTRUCTIONS:
+      - NO INLINE FLAGS: NEVER use prefixes like "(?i)" or "(?m)". JavaScript regex engines do not support them and they will cause the system to CRASH.
+      - NO ASSUMPTIONS: Do not assume fixed labels exist. Many emails are sentence-based or flow-through text.
+      - ANCHOR-BASED PARSING: For 'descriptionRegex', identify common transactional anchors (e.g., "at", "by", "to", "from", "used for", "spent on") and capture the merchant or recipient name following them.
+      - FLEXIBILITY: Use '.*?' and optional groups to bridge variations in phrasing.
+      - If a sample email ONLY describes a balance WITHOUT a specific money movement event, IGNORE it.
+      - DO NOT return "N/A", "None", or any placeholder text. 
 
       Output Format (Strict JSON):
       {
         "patterns": [
           {
-            "amountRegex": "Regex capturing the amount (e.g., 'Rs\\\\.?\\\\s*([\\\\d,]+\\\\.\\\\d{2})').",
-            "descriptionRegex": "Regex capturing the merchant/recipient name (e.g., '(?:to|by|at|VPA)\\\\s+([A-Za-z0-9\\\\.\\\\s@]+?)(?:\\\\s+on|\\\\s+from|\\\\.|$)').",
-            "dateRegex": "Regex capturing the transaction date (if present).",
-            "accountNumberRegex": "Regex capturing the account digits (e.g., '(?:account|A\\\\/c|ending|\\\\*\\\\*|XX)\\\\s*(\\\\d+)').",
-            "creditRegex": "Pattern matching ONLY for money-in keywords (e.g., 'credited|received|deposited').",
-            "dateFormat": "Date format found (e.g., 'dd-MM-yy' or 'dd-MMM-yy')."
+            "amountRegex": "Regex capturing the numeric amount",
+            "descriptionRegex": "Regex capturing ONLY the merchant/sender name. Use non-greedy anchors suitable for the sample structure.",
+            "accountNumberRegex": "Regex capturing the account digits (if present)",
+            "creditRegex": "Pattern matching keywords for money-in (e.g. 'credited|received|refunded'). Do not use flags or groups like (?i)."
           }
         ]
       }
 
-      EXAMPLES OF WHAT TO IGNORE:
-      - "The available balance in your account XX1234 is Rs. 10,000.00 as of 01-Jan-24." (ONLY balance, NO transaction event)
-      - "Your account balance has been updated." (NO transaction details)
-
-      EXAMPLES OF WHAT TO CAPTURE:
-      - "Rs. 500 has been debited from account 1234 to VPA name@okbank on 01-Jan-24." (Money movement!)
-      - "Rs. 1000 credited to account 1234 by XYZ on 01-Jan-24." (Money movement!)
-      - "Payment of Rs. 200 from A/c 1234 to Amazon." (Money movement!)
-
       RULES:
-      1. MINIMIZE: Merge similar transaction formats using OR logic. Aim for 1-2 robust patterns.
-      2. FLEXIBILITY: Use '.*?' to bridge gaps.
-      3. TYPE: If 'creditRegex' matches, it is a credit. Otherwise, it's a debit.
+      1. JAVASCRIPT COMPATIBILITY: Your regex strings MUST be compatible with the JavaScript RegExp constructor. Inline flags are FORBIDDEN.
+      2. MULTIPLE PATTERNS: If the samples show different structures, provide 2-3 SEPARATE patterns in the array.
+      3. CLEANLINESS: The 'descriptionRegex' MUST NOT capture dates, amounts, or structural footers.
     `;
 
     const result = await model.generateContent(prompt);
