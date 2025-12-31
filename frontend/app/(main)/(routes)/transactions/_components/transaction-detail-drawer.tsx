@@ -9,6 +9,7 @@ import { Trash2 } from 'lucide-react'
 import Image from 'next/image'
 import { useState } from 'react'
 import { EditTransactionDrawer } from './edit-transaction-drawer'
+import { getLogoUrl } from '@/lib/logos'
 
 interface TransactionDetailDrawerProps {
   transaction: Transaction | null
@@ -34,7 +35,7 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
 
   const fromEmail = transaction.accountId?.domainIds?.[0]?.fromEmail || 'gmail.com'
   const domainName = fromEmail.split('@')[1] || 'gmail.com'
-  const logoUrl = `https://www.google.com/s2/favicons?domain=${domainName}&sz=128`
+  const logoUrl = getLogoUrl(domainName)
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -51,7 +52,7 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
                 {transaction.categoryId?.emoji ? (
                   <span className="text-3xl">{transaction.categoryId.emoji}</span>
                 ) : (
-                  <Image src={logoUrl} alt="Bank Logo" width={40} height={40} className="w-10 h-10 object-contain" unoptimized />
+                  <Image src={logoUrl} alt="Bank Logo" width={40} height={40} className="w-10 h-10 object-contain" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -82,7 +83,7 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
             <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 flex items-center justify-between border border-border/40">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center p-1 overflow-hidden">
-                  <Image src={logoUrl} alt="Bank Logo" width={32} height={32} className="w-full h-full object-contain" unoptimized />
+                  <Image src={logoUrl} alt="Bank Logo" width={32} height={32} className="w-full h-full object-contain" />
                 </div>
                 <span className="text-sm font-black uppercase tracking-tight">{transaction.accountId?.title}</span>
               </div>
