@@ -5,8 +5,133 @@ import { getAccountsByUserId } from '../db/accountModel';
 import { getSyncState, updateSyncState } from '../db/syncStateModel';
 import { createTransaction } from '../db/transactionModel';
 import { decrypt } from '../helpers/encryption';
-import { fetchEmailsIncrementally } from '../helpers/imap';
+import { fetchEmailsIncrementally, fetchLatestEmailWithAttachment } from '../helpers/imap';
 import { getRegexById } from '../db/regexModel';
+import { getUserById } from '../db/userModel';
+import { updateInvestmentByUserId, getInvestmentByUserId } from '../db/investmentModel';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+import { parseCASText } from '../helpers/casParser';
+
+export const syncInvestments = async (req: AuthRequest, res: express.Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.sendStatus(401);
+
+    // 1. Get user and PAN
+    const user = await getUserById(userId);
+    if (!user || !user.pan) {
+      return res.status(400).json({ message: 'PAN number not found. Please update your profile.' });
+    }
+
+    // 2. Get active Gmail link
+    const linkedAccount = await getActiveLinkedAccountByUserId(userId);
+    if (!linkedAccount || linkedAccount.provider !== 'gmail') {
+      return res.status(400).json({ message: 'Please link a Gmail account first' });
+    }
+
+    const appPassword = decrypt(linkedAccount.appPassword);
+    const email = linkedAccount.email;
+
+    // 3. Fetch latest CAS email from CDSL
+    const { attachment, date, uid } = await fetchLatestEmailWithAttachment(
+      email,
+      appPassword,
+      'ecas@cdslstatement.com',
+      '.pdf'
+    );
+
+    if (!attachment) {
+      return res.status(404).json({ message: 'No CAS statement found in your emails.' });
+    }
+
+    // 3.1 Check if this email has already been synced
+    const currentInvestment = await getInvestmentByUserId(userId);
+    if (currentInvestment && currentInvestment.lastSyncedEmailUid === uid) {
+      return res.status(200).json({ 
+        message: 'Your investment portfolio is already up to date.',
+        lastSyncedAt: currentInvestment.lastSyncedAt,
+        summary: currentInvestment.summary,
+        alreadySynced: true
+      });
+    }
+
+    // 4. Extract text and parse
+    try {
+      const data = new Uint8Array(attachment);
+      const loadingTask = pdfjsLib.getDocument({
+        data,
+        password: user.pan.toUpperCase(),
+        stopAtErrors: true,
+      });
+
+      const pdfDocument = await loadingTask.promise;
+      
+      console.log(`Successfully unlocked PDF with PAN: ${user.pan}`);
+
+      let fullText = '';
+      for (let i = 1; i <= pdfDocument.numPages; i++) {
+        const page = await pdfDocument.getPage(i);
+        const textContent = await page.getTextContent();
+        
+        // Group items by their vertical position (y-coordinate) to form lines
+        const items = textContent.items as any[];
+        const lines: { [key: number]: any[] } = {};
+        
+        items.forEach((item) => {
+          const y = Math.round(item.transform[5]); // Round to handle small offsets
+          if (!lines[y]) lines[y] = [];
+          lines[y].push(item);
+        });
+
+        // Sort lines from top to bottom, and items within each line from left to right
+        const sortedY = Object.keys(lines).map(Number).sort((a, b) => b - a);
+        const pageText = sortedY.map((y) => {
+          return lines[y]
+            .sort((a, b) => a.transform[4] - b.transform[4])
+            .map((item) => item.str)
+            .join(' ');
+        }).join('\n');
+
+        fullText += `\n--- Page ${i} ---\n${pageText}\n`;
+      }
+
+      // Use manual parser to analyze the text
+      const parsedData = parseCASText(fullText);
+      if (!parsedData) {
+        return res.status(500).json({ message: 'Failed to parse statement content' });
+      }
+      
+      // 5. Update investment record
+      await updateInvestmentByUserId(userId, {
+        pan: user.pan,
+        lastSyncedAt: date || new Date(),
+        lastSyncedEmailUid: uid,
+        casId: parsedData.casId,
+        statementPeriod: parsedData.statementPeriod,
+        summary: parsedData.summary,
+        historicalValuation: parsedData.historicalValuation,
+        mutualFunds: parsedData.mutualFunds,
+        stocks: parsedData.stocks,
+      });
+
+      return res.status(200).json({ 
+        message: 'Statement synced and analyzed successfully',
+        lastSyncedAt: date || new Date(),
+        summary: parsedData.summary
+      });
+    } catch (pdfError: any) {
+      if (pdfError.name === 'PasswordException') {
+        return res.status(400).json({ message: 'Failed to unlock PDF. Please check if your PAN is correct.' });
+      }
+      console.error('PDF Processing Error:', pdfError);
+      throw pdfError;
+    }
+
+  } catch (error) {
+    console.error('Investment sync error:', error);
+    return res.status(500).json({ message: 'Internal server error during investment sync' });
+  }
+};
 
 export const syncAccountTransactions = async (req: AuthRequest, res: express.Response) => {
   try {

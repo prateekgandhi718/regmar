@@ -6,6 +6,8 @@ import linkedAccounts from './linkedAccounts';
 import sync from './sync';
 import ai from './ai';
 import transactions from './transactions';
+import users from './users';
+import investments from './investments';
 
 const router = express.Router();
 
@@ -17,6 +19,8 @@ export default (): express.Router => {
   sync(router);
   ai(router);
   transactions(router);
+  users(router);
+  investments(router);
   return router;
 };
 

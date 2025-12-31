@@ -6,6 +6,7 @@ import { linkedAccountsApi } from './api/linkedAccountsApi'
 import { syncApi } from './api/syncApi'
 import { transactionsApi } from './api/transactionsApi'
 import { categoriesApi } from './api/categoriesApi'
+import { investmentsApi } from './api/investmentsApi'
 import authReducer from './features/authSlice'
 
 export const store = configureStore({
@@ -17,10 +18,19 @@ export const store = configureStore({
     [syncApi.reducerPath]: syncApi.reducer,
     [transactionsApi.reducerPath]: transactionsApi.reducer,
     [categoriesApi.reducerPath]: categoriesApi.reducer,
+    [investmentsApi.reducerPath]: investmentsApi.reducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(authApi.middleware, accountsApi.middleware, linkedAccountsApi.middleware, syncApi.middleware, transactionsApi.middleware, categoriesApi.middleware),
+    getDefaultMiddleware().concat(
+      authApi.middleware, 
+      accountsApi.middleware, 
+      linkedAccountsApi.middleware, 
+      syncApi.middleware, 
+      transactionsApi.middleware, 
+      categoriesApi.middleware,
+      investmentsApi.middleware
+    ),
 })
 
 setupListeners(store.dispatch)
