@@ -118,6 +118,63 @@ export const fetchEmailsIncrementally = async (
   return { emails, lastUid: newLastUid };
 };
 
+export const fetchLatestEmailWithAttachment = async (
+  email: string,
+  appPassword: string,
+  fromEmail: string,
+  fileNamePattern?: string
+): Promise<{ attachment: Buffer | null; date: Date | null; uid: number | null }> => {
+  const client = new ImapFlow({
+    host: 'imap.gmail.com',
+    port: 993,
+    secure: true,
+    auth: {
+      user: email,
+      pass: appPassword,
+    },
+    logger: false,
+  });
+
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX');
+
+    try {
+      const searchCriteria = { from: fromEmail };
+      const messages = await client.search(searchCriteria);
+      
+      const targetSeqs = Array.isArray(messages) ? messages : [];
+      if (targetSeqs.length === 0) return { attachment: null, date: null, uid: null };
+
+      // Get the latest one
+      const latestSeq = targetSeqs[targetSeqs.length - 1];
+      const message = await client.fetchOne(latestSeq.toString(), { source: true, envelope: true, uid: true });
+      
+      if (message && message.source) {
+        const parsed = await simpleParser(message.source);
+        const attachment = parsed.attachments.find(att => 
+          !fileNamePattern || att.filename?.toLowerCase().includes(fileNamePattern.toLowerCase())
+        );
+
+        return {
+          attachment: attachment ? attachment.content : null,
+          date: message.envelope?.date || parsed.date || null,
+          uid: message.uid || null
+        };
+      }
+    } finally {
+      lock.release();
+    }
+    await client.logout();
+  } catch (error) {
+    console.error(`IMAP attachment fetch error for ${email}:`, error);
+    try { await client.logout(); } catch (e) {}
+    throw error;
+  }
+
+  return { attachment: null, date: null, uid: null };
+};
+
 export const fetchDiverseSamples = async (
   email: string,
   appPassword: string,

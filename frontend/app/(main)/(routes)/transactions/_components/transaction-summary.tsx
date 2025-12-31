@@ -6,6 +6,7 @@ import { format, parseISO, subMonths, startOfMonth, endOfMonth, isWithinInterval
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
 import { formatAmount } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { isInvestment, isExpense, getTransactionAmount } from '@/lib/transactions'
 
 const ACCOUNT_COLORS = ['bg-red-500', 'bg-indigo-500', 'bg-purple-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-teal-500', 'bg-rose-500', 'bg-lime-500']
 
@@ -55,17 +56,15 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
       let investments = 0
 
       transactions.forEach((tx) => {
+        if (tx.refunded) return
+
         const txDate = parseISO(tx.newDate || tx.originalDate)
         if (isWithinInterval(txDate, { start: monthStart, end: monthEnd })) {
-          const isInvestment = tx.categoryId?.name === 'Investment'
-          const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
-
-          if (tx.type === 'debit') {
-            if (isInvestment) {
-              investments += tx.newAmount || tx.originalAmount
-            } else if (!isSelfTransfer) {
-              expenses += tx.newAmount || tx.originalAmount
-            }
+          const amount = getTransactionAmount(tx)
+          if (isInvestment(tx)) {
+            investments += amount
+          } else if (isExpense(tx)) {
+            expenses += amount
           }
         }
       })
@@ -90,35 +89,33 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
       const monthsInRange = chartData.map((d) => d.fullMonthYear)
 
       transactions.forEach((tx) => {
+        if (tx.refunded) return
+
         const txDate = parseISO(tx.newDate || tx.originalDate)
         const txMonthYear = format(txDate, 'MMM yyyy').toUpperCase()
 
         if (monthsInRange.includes(txMonthYear)) {
-          const isInvestment = tx.categoryId?.name === 'Investment'
-          const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
+          const amount = getTransactionAmount(tx)
+          if (isInvestment(tx)) {
+            totalInvestments += amount
+          } else if (isExpense(tx)) {
+            totalExpenses += amount
 
-          if (tx.type === 'debit') {
-            if (isInvestment) {
-              totalInvestments += tx.originalAmount
-            } else if (!isSelfTransfer) {
-              totalExpenses += tx.originalAmount
+            // Accounts split (only for expenses)
+            const accName = tx.accountId.title
+            accountMap[accName] = (accountMap[accName] || 0) + amount
 
-              // Accounts split (only for expenses)
-              const accName = tx.accountId.title
-              accountMap[accName] = (accountMap[accName] || 0) + tx.originalAmount
-
-              // Category split (only for expenses)
-              if (tx.categoryId) {
-                const catName = tx.categoryId.name
-                if (!categoryMap[catName]) {
-                  categoryMap[catName] = {
-                    amount: 0,
-                    emoji: tx.categoryId.emoji || '📁',
-                    color: tx.categoryId.color || '#94a3b8',
-                  }
+            // Category split (only for expenses)
+            if (tx.categoryId) {
+              const catName = tx.categoryId.name
+              if (!categoryMap[catName]) {
+                categoryMap[catName] = {
+                  amount: 0,
+                  emoji: tx.categoryId.emoji,
+                  color: tx.categoryId.color || '#94a3b8',
                 }
-                categoryMap[catName].amount += tx.originalAmount
               }
+              categoryMap[catName].amount += amount
             }
           }
         }
@@ -142,33 +139,31 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
     const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {}
 
     transactions.forEach((tx) => {
+      if (tx.refunded) return
+
       const txDate = parseISO(tx.newDate || tx.originalDate)
       const txMonthYear = format(txDate, 'MMM yyyy').toUpperCase()
 
       if (txMonthYear === selectedMonthYear) {
-        const isInvestment = tx.categoryId?.name === 'Investment'
-        const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
+        const amount = getTransactionAmount(tx)
+        if (isInvestment(tx)) {
+          totalInvestments += amount
+        } else if (isExpense(tx)) {
+          totalExpenses += amount
 
-        if (tx.type === 'debit') {
-          if (isInvestment) {
-            totalInvestments += tx.originalAmount
-          } else if (!isSelfTransfer) {
-            totalExpenses += tx.originalAmount
+          const accName = tx.accountId.title
+          accountMap[accName] = (accountMap[accName] || 0) + amount
 
-            const accName = tx.accountId.title
-            accountMap[accName] = (accountMap[accName] || 0) + tx.originalAmount
-
-            if (tx.categoryId) {
-              const catName = tx.categoryId.name
-              if (!categoryMap[catName]) {
-                categoryMap[catName] = {
-                  amount: 0,
-                  emoji: tx.categoryId.emoji || '📁',
-                  color: tx.categoryId.color || '#94a3b8',
-                }
+          if (tx.categoryId) {
+            const catName = tx.categoryId.name
+            if (!categoryMap[catName]) {
+              categoryMap[catName] = {
+                amount: 0,
+                emoji: tx.categoryId.emoji,
+                color: tx.categoryId.color || '#94a3b8',
               }
-              categoryMap[catName].amount += tx.originalAmount
             }
+            categoryMap[catName].amount += amount
           }
         }
       }
@@ -208,14 +203,14 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
             <XAxis dataKey="monthYear" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600, fill: '#64748b' }} dy={10} />
             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }} tickFormatter={(value) => `${value / 1000}K`} />
-            <Bar name="investments" dataKey="investments" stackId="a" radius={[0, 0, 0, 0]} pointerEvents="none">
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-inv-${index}`} fill="#60a5fa" />
-              ))}
-            </Bar>
-            <Bar name="expenses" dataKey="expenses" stackId="a" radius={[4, 4, 0, 0]} pointerEvents="none">
+            <Bar name="expenses" dataKey="expenses" radius={[4, 4, 0, 0]} barSize={16} pointerEvents="none">
               {chartData.map((entry, index) => (
                 <Cell key={`cell-exp-${index}`} fill="#f97316" />
+              ))}
+            </Bar>
+            <Bar name="investments" dataKey="investments" radius={[4, 4, 0, 0]} barSize={16} pointerEvents="none">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-inv-${index}`} fill="#60a5fa" />
               ))}
             </Bar>
           </BarChart>

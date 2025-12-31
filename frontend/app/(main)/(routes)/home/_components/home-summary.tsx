@@ -28,6 +28,7 @@ import { useSelector } from 'react-redux'
 import { selectCurrentUser } from '@/redux/features/authSlice'
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { isExpense, getTransactionAmount } from '@/lib/transactions'
 
 interface HomeSummaryProps {
   transactions: Transaction[]
@@ -62,13 +63,10 @@ export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
 
     const calculateTotal = (start: Date, end: Date) => {
       return transactions.reduce((acc, tx) => {
+        if (tx.refunded) return acc
         const txDate = parseISO(tx.newDate || tx.originalDate)
-        if (isWithinInterval(txDate, { start, end }) && tx.type === 'debit') {
-          const isInvestment = tx.categoryId?.name === 'Investment'
-          const isSelfTransfer = tx.categoryId?.name === 'Self Transfer'
-          if (!isInvestment && !isSelfTransfer) {
-            return acc + (tx.newAmount || tx.originalAmount)
-          }
+        if (isWithinInterval(txDate, { start, end }) && isExpense(tx)) {
+          return acc + getTransactionAmount(tx)
         }
         return acc
       }, 0)
@@ -109,17 +107,19 @@ export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
 
       return hours.map((hour, index) => {
         const currentHourTxs = transactions.filter((tx) => {
+          if (tx.refunded) return false
           const txDate = parseISO(tx.newDate || tx.originalDate)
-          return isSameHour(txDate, hour) && tx.type === 'debit' && tx.categoryId?.name !== 'Investment' && tx.categoryId?.name !== 'Self Transfer'
+          return isSameHour(txDate, hour) && isExpense(tx)
         })
 
         const prevHourTxs = transactions.filter((tx) => {
+          if (tx.refunded) return false
           const txDate = parseISO(tx.newDate || tx.originalDate)
-          return isSameHour(txDate, prevHours[index]) && tx.type === 'debit' && tx.categoryId?.name !== 'Investment' && tx.categoryId?.name !== 'Self Transfer'
+          return isSameHour(txDate, prevHours[index]) && isExpense(tx)
         })
 
-        currentSum += currentHourTxs.reduce((acc, tx) => acc + (tx.newAmount || tx.originalAmount), 0)
-        prevSum += prevHourTxs.reduce((acc, tx) => acc + (tx.newAmount || tx.originalAmount), 0)
+        currentSum += currentHourTxs.reduce((acc, tx) => acc + getTransactionAmount(tx), 0)
+        prevSum += prevHourTxs.reduce((acc, tx) => acc + getTransactionAmount(tx), 0)
 
         // Don't show future data for today
         const isFuture = isAfter(hour, now)
@@ -148,17 +148,19 @@ export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
 
       return days.map((day, index) => {
         const currentDayTxs = transactions.filter((tx) => {
+          if (tx.refunded) return false
           const txDate = parseISO(tx.newDate || tx.originalDate)
-          return isSameDay(txDate, day) && tx.type === 'debit' && tx.categoryId?.name !== 'Investment' && tx.categoryId?.name !== 'Self Transfer'
+          return isSameDay(txDate, day) && isExpense(tx)
         })
 
         const prevDayTxs = transactions.filter((tx) => {
+          if (tx.refunded) return false
           const txDate = parseISO(tx.newDate || tx.originalDate)
-          return isSameDay(txDate, prevDays[index]) && tx.type === 'debit' && tx.categoryId?.name !== 'Investment' && tx.categoryId?.name !== 'Self Transfer'
+          return isSameDay(txDate, prevDays[index]) && isExpense(tx)
         })
 
-        currentSum += currentDayTxs.reduce((acc, tx) => acc + (tx.newAmount || tx.originalAmount), 0)
-        prevSum += prevDayTxs.reduce((acc, tx) => acc + (tx.newAmount || tx.originalAmount), 0)
+        currentSum += currentDayTxs.reduce((acc, tx) => acc + getTransactionAmount(tx), 0)
+        prevSum += prevDayTxs.reduce((acc, tx) => acc + getTransactionAmount(tx), 0)
 
         const isFuture = isAfter(day, now) && !isSameDay(day, now)
 
@@ -186,8 +188,9 @@ export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
 
     return days.map((day, index) => {
       const currentDayTxs = transactions.filter((tx) => {
+        if (tx.refunded) return false
         const txDate = parseISO(tx.newDate || tx.originalDate)
-        return isSameDay(txDate, day) && tx.type === 'debit' && tx.categoryId?.name !== 'Investment' && tx.categoryId?.name !== 'Self Transfer'
+        return isSameDay(txDate, day) && isExpense(tx)
       })
 
       // Handle months with different number of days
@@ -195,13 +198,14 @@ export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
       let prevSumIncrement = 0
       if (prevDay) {
         const prevDayTxs = transactions.filter((tx) => {
+          if (tx.refunded) return false
           const txDate = parseISO(tx.newDate || tx.originalDate)
-          return isSameDay(txDate, prevDay) && tx.type === 'debit' && tx.categoryId?.name !== 'Investment' && tx.categoryId?.name !== 'Self Transfer'
+          return isSameDay(txDate, prevDay) && isExpense(tx)
         })
-        prevSumIncrement = prevDayTxs.reduce((acc, tx) => acc + (tx.newAmount || tx.originalAmount), 0)
+        prevSumIncrement = prevDayTxs.reduce((acc, tx) => acc + getTransactionAmount(tx), 0)
       }
 
-      currentSum += currentDayTxs.reduce((acc, tx) => acc + (tx.newAmount || tx.originalAmount), 0)
+      currentSum += currentDayTxs.reduce((acc, tx) => acc + getTransactionAmount(tx), 0)
       prevSum += prevSumIncrement
 
       const isFuture = isAfter(day, now) && !isSameDay(day, now)

@@ -1,6 +1,7 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { baseQueryWithReauth } from './baseQuery'
 import { transactionsApi } from './transactionsApi'
+import { investmentsApi } from './investmentsApi'
 
 export const syncApi = createApi({
   reducerPath: 'syncApi',
@@ -20,7 +21,20 @@ export const syncApi = createApi({
         } catch {}
       },
     }),
+    syncInvestments: builder.mutation<{ message: string; lastSyncedAt: string; alreadySynced?: boolean }, void>({
+      query: () => ({
+        url: '/sync/investments',
+        method: 'POST',
+      }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled
+          // Invalidate investments to refresh UI
+          dispatch(investmentsApi.util.invalidateTags(['Investment']))
+        } catch {}
+      },
+    }),
   }),
 })
 
-export const { useSyncTransactionsMutation } = syncApi
+export const { useSyncTransactionsMutation, useSyncInvestmentsMutation } = syncApi

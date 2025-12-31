@@ -14,6 +14,7 @@ import { QuickTagDrawer } from './_components/quick-tag-drawer'
 import { TransactionDetailDrawer } from './_components/transaction-detail-drawer'
 import { TransactionSummary } from './_components/transaction-summary'
 import { SetupPrompts } from '@/components/setup-prompts'
+import { isExpense, getTransactionAmount } from '@/lib/transactions'
 
 const TransactionsPage = () => {
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery()
@@ -87,6 +88,7 @@ const TransactionsPage = () => {
     const monthGroups: MonthGroup[] = []
 
     sortedTxs.forEach((tx) => {
+      if (tx.refunded) return
       const date = parseISO(tx.newDate || tx.originalDate)
       const monthYear = format(date, 'MMM yyyy').toUpperCase()
 
@@ -96,10 +98,9 @@ const TransactionsPage = () => {
         monthGroups.push(monthGroup)
       }
 
-      const isExcludedFromDebitTotal = tx.categoryId && (tx.categoryId.name === 'Self Transfer' || tx.categoryId.name === 'Investment')
-
-      if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
-        monthGroup.total += tx.newAmount || tx.originalAmount
+      if (isExpense(tx)) {
+        const amount = getTransactionAmount(tx)
+        monthGroup.total += amount
       }
 
       let dayGroup = monthGroup.days.find((d) => isSameDay(d.date, date))
@@ -108,8 +109,9 @@ const TransactionsPage = () => {
         monthGroup.days.push(dayGroup)
       }
 
-      if (tx.type === 'debit' && !isExcludedFromDebitTotal) {
-        dayGroup.total += tx.newAmount || tx.originalAmount
+      if (isExpense(tx)) {
+        const amount = getTransactionAmount(tx)
+        dayGroup.total += amount
       }
       dayGroup.transactions.push(tx)
     })

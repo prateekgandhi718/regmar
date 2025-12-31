@@ -2,6 +2,7 @@ import { MoreVertical } from 'lucide-react'
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { getLogoUrl } from '@/lib/logos'
 
 interface AccountCardProps {
   title: string
@@ -13,7 +14,7 @@ interface AccountCardProps {
 
 export const AccountCard = ({ title, accountNumber, domainName, currency, className }: AccountCardProps) => {
   const extractedDomain = domainName?.split('@').pop()
-  const iconUrl = extractedDomain ? `https://www.google.com/s2/favicons?domain_url=${extractedDomain}&sz=64` : null
+  const iconUrl = extractedDomain ? getLogoUrl(extractedDomain) : null
 
   return (
     <Card className={cn('relative w-64 aspect-video rounded-2xl p-4 text-white overflow-hidden border-none shadow-lg shrink-0', 'bg-linear-to-br from-rose-500 via-rose-600 to-rose-800', className)}>
