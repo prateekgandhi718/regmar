@@ -16,11 +16,10 @@ import {
   DomainModel,
 } from "../db/domainModel";
 import {
-  getRegexesByDomain,
-  createRegex,
-  updateRegexByDomain,
-  deleteRegexById,
-} from "../db/regexModel";
+  getParserConfigByDomain,
+  createParserConfig,
+  ParserConfigModel,
+} from "../db/parserConfigModel";
 import { deleteTransactionsByAccountId } from "../db/transactionModel";
 import { getActiveLinkedAccountByUserId } from "../db/linkedAccountModel";
 import { deleteSyncStatesByDomainId } from "../db/syncStateModel";
@@ -30,13 +29,16 @@ import { generateRegexFromEmailInternal } from "./ai";
 import { AuthRequest } from "../middlewares/auth";
 
 /**
- * Helper to clean up a single domain and its related data (sync state, regexes if unused)
+ * Helper to clean up a single domain and its related data
+ * - sync state
+ * - domain document
+ * - parser config if unused
  */
 const cleanupDomain = async (userId: string, domainId: string) => {
   const domain = await DomainModel.findById(domainId);
   if (!domain) return;
 
-  const regexIds = domain.regexIds.map((rid: any) => rid.toString());
+  const parserConfigId = domain.parserConfigId?.toString();
 
   // 1. Delete sync state
   await deleteSyncStatesByDomainId(domainId);
@@ -44,19 +46,22 @@ const cleanupDomain = async (userId: string, domainId: string) => {
   // 2. Delete domain document
   await deleteDomainById(domainId);
 
-  // 3. Clean up regexes if not used by any other domain for this user
-  for (const rid of regexIds) {
+  // 3. Delete parser config if unused by any other domain of this user
+  if (parserConfigId) {
     const isStillUsed = await DomainModel.findOne({
       userId,
-      regexIds: rid,
+      parserConfigId,
     });
 
     if (!isStillUsed) {
-      console.log(`Regex ${rid} is no longer used by any domain for user ${userId}. Deleting...`);
-      await deleteRegexById(rid);
+      console.log(
+        `ParserConfig ${parserConfigId} is no longer used by any domain for user ${userId}. Deleting...`
+      );
+      await ParserConfigModel.findByIdAndDelete(parserConfigId);
     }
   }
 };
+
 
 /**
  * Helper to process domains for an account:
@@ -76,12 +81,10 @@ const processAccountDomains = async (
 
   for (const fromEmail of domainNames) {
     if (!fromEmail.trim()) continue;
-
     const emailDomain = fromEmail.trim();
-    const existingRegexes = await getRegexesByDomain(userId, emailDomain);
-    let regexIds: string[] = existingRegexes.map((r) => r._id.toString());
+    let parserConfig = await getParserConfigByDomain(userId, emailDomain);
 
-    if (regexIds.length === 0) {
+    if (!parserConfig) {
       console.log(`No existing regex patterns for ${emailDomain}. Fetching diverse samples for AI...`);
 
       // BUCKET SAMPLING LOGIC
@@ -145,62 +148,31 @@ const processAccountDomains = async (
         emailDomain
       );
 
-      if (aiResult?.patterns && Array.isArray(aiResult.patterns)) {
-        console.log(`Generated ${aiResult.patterns.length} patterns from AI. Filtering...`);
-
-        for (const pattern of aiResult.patterns) {
-          if (!pattern.amountRegex || !pattern.descriptionRegex) continue;
-
-          // Programmatic safety net: Strip inline flags like (?i) or (?m) if AI ignored prompt
-          const cleanRegex = (str: string) => str.replace(/\(\?[imsguy]+\)/g, "").trim();
-
-          const sanitizedPattern = {
-            amountRegex: cleanRegex(pattern.amountRegex),
-            descriptionRegex: cleanRegex(pattern.descriptionRegex),
-            accountNumberRegex: pattern.accountNumberRegex ? cleanRegex(pattern.accountNumberRegex) : undefined,
-            creditRegex: pattern.creditRegex ? cleanRegex(pattern.creditRegex) : undefined,
-          };
-
-          // Final safety check: ignore patterns that look like Gemini explanations or balance-only detections
-          const invalidMarkers = ["n/a", "none", "balance alert", "no transaction", "balance update"];
-          const isInvalid = invalidMarkers.some(marker => 
-            sanitizedPattern.descriptionRegex.toLowerCase().includes(marker) || 
-            (sanitizedPattern.creditRegex && sanitizedPattern.creditRegex.toLowerCase().includes(marker))
-          );
-
-          if (isInvalid) {
-            console.log(`Skipping invalid/placeholder pattern generated for ${fromEmail}: ${sanitizedPattern.descriptionRegex}`);
-            continue;
-          }
-
-          const regexDoc = await createRegex({
-            userId,
-            domain: emailDomain,
-            ...sanitizedPattern,
-          });
-          regexIds.push(regexDoc._id.toString());
-        }
+      if (aiResult && aiResult.transactionIndicators && aiResult.extractionPatterns) {
+        parserConfig = await createParserConfig({
+          userId,
+          domain: emailDomain,
+          transactionIndicators: aiResult.transactionIndicators,
+          extractionPatterns: aiResult.extractionPatterns,
+        });
+      } else {
+        throw new Error(
+          `Failed to generate parser config for ${fromEmail} (missing fields from LLM).`
+        );
       }
     } else {
-      console.log(`Found ${regexIds.length} existing regex patterns for ${emailDomain}. Using them directly.`);
+      console.log(`Using existing parser config for ${emailDomain}.`);
     }
 
-    if (regexIds.length === 0) {
-      throw new Error(
-        `Failed to find or generate any valid transaction patterns for ${fromEmail}.`
-      );
-    }
-
+    // Create and associate domain with parser config
     const domain = await createDomain({
       userId,
       accountId,
       fromEmail: emailDomain,
-      regexIds,
+      parserConfigId: parserConfig._id,
     });
-
     domainIds.push(domain._id.toString());
   }
-
   return domainIds;
 };
 
