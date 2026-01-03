@@ -18,46 +18,125 @@ export const generateRegexFromEmailInternal = async (emailBodies: string[], from
     const combinedEmails = emailBodies.map((body, i) => `Email Sample ${i + 1}:\n"""\n${body}\n"""`).join('\n\n');
 
     const prompt = `
-      You are an expert at pattern recognition and regex generation for banking notifications.
-      Sender: "${fromEmail}"
+You are a financial email analysis system that helps parse bank transaction emails.
 
-      CONTEXT:
-      I am providing you with a DIVERSE set of email samples (Debits and Credits).
-      
-      GOAL:
-      Generate robust regex patterns to parse these TRANSACTIONAL emails.
-      
-      Analyze these samples:
-      ${combinedEmails}
+Sender domain: "${fromEmail}"
 
-      DEFINITION OF A TRANSACTION:
-      - A transaction MUST involve money movement (spent, paid, received, credited, debited, transferred).
-      - AN EMAIL THAT ONLY SHOWS "AVAILABLE BALANCE", "ACCOUNT BALANCE", OR "BALANCE UPDATE" IS NOT A TRANSACTION.
+You are given multiple email samples sent by a bank.
+Some samples represent MONEY MOVEMENT transactions.
+Some samples may be informational or balance-related.
 
-      CRITICAL INSTRUCTIONS:
-      - NO INLINE FLAGS: NEVER use prefixes like "(?i)" or "(?m)". JavaScript regex engines do not support them and they will cause the system to CRASH.
-      - NO ASSUMPTIONS: Do not assume fixed labels exist. Many emails are sentence-based or flow-through text.
-      - ANCHOR-BASED PARSING: For 'descriptionRegex', identify common transactional anchors (e.g., "at", "by", "to", "from", "used for", "spent on") and capture the merchant or recipient name following them.
-      - FLEXIBILITY: Use '.*?' and optional groups to bridge variations in phrasing.
-      - If a sample email ONLY describes a balance WITHOUT a specific money movement event, IGNORE it.
-      - DO NOT return "N/A", "None", or any placeholder text. 
+Your job is NOT to be precise.
+Your job is to maximize RECALL of legitimate transactions.
 
-      Output Format (Strict JSON):
-      {
-        "patterns": [
-          {
-            "amountRegex": "Regex capturing the numeric amount",
-            "descriptionRegex": "Regex capturing ONLY the merchant/sender name. Use non-greedy anchors suitable for the sample structure.",
-            "accountNumberRegex": "Regex capturing the account digits (if present)",
-            "creditRegex": "Pattern matching keywords for money-in (e.g. 'credited|received|refunded'). Do not use flags or groups like (?i)."
-          }
-        ]
-      }
+It is acceptable to include false positives.
+It is NOT acceptable to miss real debit or credit transactions.
 
-      RULES:
-      1. JAVASCRIPT COMPATIBILITY: Your regex strings MUST be compatible with the JavaScript RegExp constructor. Inline flags are FORBIDDEN.
-      2. MULTIPLE PATTERNS: If the samples show different structures, provide 2-3 SEPARATE patterns in the array.
-      3. CLEANLINESS: The 'descriptionRegex' MUST NOT capture dates, amounts, or structural footers.
+--------------------------------
+DEFINITION OF A TRANSACTION
+--------------------------------
+An email represents a transaction if it indicates money being:
+- debited
+- credited
+- paid
+- received
+- transferred
+- refunded
+- reversed
+
+Emails that ONLY show balance, limit, due date, or statements
+WITHOUT a money movement event are NOT transactions.
+
+--------------------------------
+IMPORTANT PRINCIPLES
+--------------------------------
+1. Detection and extraction are SEPARATE.
+2. Regexes are BEST-EFFORT extractors, not strict validators.
+3. Amount extraction is mandatory.
+4. Merchant/description extraction is OPTIONAL.
+5. Dates and account numbers are NOT required.
+6. Regexes MUST be forgiving and tolerant of variation.
+
+--------------------------------
+EMAIL SAMPLES
+--------------------------------
+${combinedEmails}
+
+--------------------------------
+WHAT YOU MUST GENERATE
+--------------------------------
+
+Generate a SINGLE JSON object with the following structure:
+
+{
+  "transactionIndicators": {
+    "creditKeywords": [],
+    "debitKeywords": [],
+    "currencyMarkers": []
+  },
+  "extractionPatterns": {
+    "amountRegexes": [],
+    "merchantRegexes": []
+  }
+}
+
+--------------------------------
+FIELD DEFINITIONS
+--------------------------------
+
+transactionIndicators.creditKeywords:
+- Words or phrases that indicate money coming IN.
+- Examples: credited, received, refund, deposited
+
+transactionIndicators.debitKeywords:
+- Words or phrases that indicate money going OUT.
+- Examples: debited, paid, spent, used, withdrawn
+
+transactionIndicators.currencyMarkers:
+- Symbols or tokens that indicate money.
+- Examples: INR, ₹, Rs
+
+extractionPatterns.amountRegexes:
+- JavaScript-compatible regex strings
+- MUST capture the numeric amount in group 1
+- MUST handle:
+  - optional decimals (559, 559., 559.00)
+  - commas (1,764.56)
+  - currency symbols (INR, ₹)
+- Prefer ONE or TWO very forgiving patterns
+
+extractionPatterns.merchantRegexes:
+- JavaScript-compatible regex strings
+- Capture the merchant / recipient name in group 1
+- These are OPTIONAL and best-effort
+- Use common anchors such as:
+  - "at"
+  - "to"
+  - "from"
+  - "by"
+  - UPI paths
+- It is OK if merchant extraction sometimes fails
+
+--------------------------------
+STRICT RULES
+--------------------------------
+- Output MUST be valid JSON only.
+- NO markdown, NO explanations.
+- NO inline regex flags like (?i), (?m), (?s).
+- Regexes MUST work with JavaScript RegExp constructor.
+- Do NOT generate placeholders like "N/A" or "None".
+- Do NOT assume fixed templates.
+- Prefer OPTIONAL groups and non-greedy matching.
+- Do NOT exclude samples just because format varies.
+
+--------------------------------
+GOAL REMINDER (MOST IMPORTANT)
+--------------------------------
+If a future email looks similar to ANY of the provided samples
+and represents real money movement,
+your indicators and regexes should still detect it.
+
+Optimize for RECALL over PRECISION.
     `;
 
     const result = await model.generateContent(prompt);

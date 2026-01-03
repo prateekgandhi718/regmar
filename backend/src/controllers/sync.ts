@@ -6,11 +6,11 @@ import { getSyncState, updateSyncState } from '../db/syncStateModel';
 import { createTransaction } from '../db/transactionModel';
 import { decrypt } from '../helpers/encryption';
 import { fetchEmailsIncrementally, fetchLatestEmailWithAttachment } from '../helpers/imap';
-import { getRegexById } from '../db/regexModel';
 import { getUserById } from '../db/userModel';
 import { updateInvestmentByUserId, getInvestmentByUserId } from '../db/investmentModel';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import { parseCASText } from '../helpers/casParser';
+import { getParserConfigByDomain } from '../db/parserConfigModel';
 
 export const syncInvestments = async (req: AuthRequest, res: express.Response) => {
   try {
@@ -138,7 +138,7 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
     const userId = req.userId;
     if (!userId) return res.sendStatus(401);
 
-    // 1. Get active Gmail link
+    // 1. Active Gmail link
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
     if (!linkedAccount || linkedAccount.provider !== 'gmail') {
       return res.status(400).json({ message: 'Please link a Gmail account first' });
@@ -147,123 +147,169 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
     const appPassword = decrypt(linkedAccount.appPassword);
     const email = linkedAccount.email;
 
-    // 2. Fetch all accounts for user with populated domainIds
+    // 2. Accounts with domains
     const accounts = await getAccountsByUserId(userId);
-    const accountsWithDomains = accounts.filter(acc => acc.domainIds && acc.domainIds.length > 0);
+    const accountsWithDomains = accounts.filter(
+      acc => acc.domainIds && acc.domainIds.length > 0
+    );
 
     if (accountsWithDomains.length === 0) {
-      return res.status(400).json({ message: 'No bank accounts with transaction domains found. Please add an account first.' });
+      return res.status(400).json({
+        message: 'No bank accounts with transaction domains found. Please add an account first.'
+      });
     }
-    
+
     let totalSynced = 0;
 
     for (const account of accountsWithDomains) {
       for (const domain of account.domainIds as any) {
-        // 3. Get sync state for this domain
+        // 3. Sync state
         const syncState = await getSyncState(userId, domain._id.toString());
         const lastUid = syncState?.lastUid || 0;
 
         let since: Date | undefined;
-        if (lastUid === 0) {
-          since = new Date();
-          since.setDate(1); // 1st of current month
-          since.setHours(0, 0, 0, 0);
-          console.log(`Initial sync for domain ${domain.fromEmail}. Fetching all emails since ${since.toISOString()}`);
-        }
 
-        // 4. Fetch new emails
+        if (lastUid === 0) {
+          const now = new Date();
+        
+          // Move to first day of current month
+          now.setDate(1);
+          now.setHours(0, 0, 0, 0);
+        
+          // Go back one month
+          now.setMonth(now.getMonth() - 1);
+        
+          since = now;
+        
+          console.log(
+            `Initial sync for ${domain.fromEmail}, fetching since ${since.toISOString()}`
+          );
+        }        
+
+        // 4. Fetch emails
         const { emails, lastUid: newLastUid } = await fetchEmailsIncrementally(
           email,
           appPassword,
           domain.fromEmail,
           lastUid,
-          undefined, // No limit for sync - fetch everything
+          undefined,
           since
         );
 
         if (emails.length === 0) continue;
 
-        console.log(`Processing ${emails.length} new emails for domain ${domain.fromEmail}`);
+        // 5. Load parser config
+        const parserConfig = await getParserConfigByDomain(userId, domain.fromEmail);
+        if (!parserConfig) {
+          console.warn(`No parser config found for ${domain.fromEmail}, skipping.`);
+          continue;
+        }
 
-        // 5. Apply regex to parse transactions
+        const transactionIndicators = {
+          creditKeywords: parserConfig.transactionIndicators?.creditKeywords ?? [],
+          debitKeywords: parserConfig.transactionIndicators?.debitKeywords ?? [],
+          currencyMarkers: parserConfig.transactionIndicators?.currencyMarkers ?? [],
+        }
+
+        const extractionPatterns = {
+          amountRegexes: parserConfig.extractionPatterns?.amountRegexes ?? [],
+          merchantRegexes: parserConfig.extractionPatterns?.merchantRegexes ?? [],
+        }
+
+        console.log(
+          `Processing ${emails.length} emails for ${domain.fromEmail}`
+        );
+
         for (const { content, date } of emails) {
           console.log(`\n--- Processing Email (${date}) ---`);
           console.log(`RAW TEXT:\n${content}\n------------------`);
 
-          let wasParsed = false;
+          const text = content.toLowerCase();
 
-          // A domain can have multiple regexIds, we try them until one works
-          for (const regexId of domain.regexIds) {
-            const regexDoc = await getRegexById(regexId.toString());
-            if (!regexDoc) continue;
+          // ---------- 1. CLASSIFICATION ----------
+          const hasCurrency = transactionIndicators.currencyMarkers.some(m =>
+            text.includes(m.toLowerCase())
+          );
 
+          const hasAction =
+            transactionIndicators.creditKeywords.some(k =>
+              text.includes(k.toLowerCase())
+            ) ||
+            transactionIndicators.debitKeywords.some(k =>
+              text.includes(k.toLowerCase())
+            );
+
+          if (!hasCurrency || !hasAction) {
+            console.log(`[${domain.fromEmail}] Skipped (classifier: not a transaction)`);
+            continue;
+          }
+
+          // ---------- 2. AMOUNT EXTRACTION (MANDATORY) ----------
+          let amount: number | null = null;
+
+          for (const amtPattern of extractionPatterns.amountRegexes) {
             try {
-              const amountRegex = new RegExp(regexDoc.amountRegex, 'i');
-              const descriptionRegex = new RegExp(regexDoc.descriptionRegex, 'i');
-              
-              const amountMatch = content.match(amountRegex);
-              const descMatch = content.match(descriptionRegex);
-
-              if (!amountMatch) {
-                console.log(`[Domain: ${domain.fromEmail}] Amount regex failed. Pattern: ${regexDoc.amountRegex}`);
+              const match = content.match(new RegExp(amtPattern, 'i'));
+              if (match) {
+                amount = parseFloat(match[1].replace(/,/g, ''));
+                if (!isNaN(amount)) break;
               }
-              if (!descMatch) {
-                console.log(`[Domain: ${domain.fromEmail}] Description regex failed. Pattern: ${regexDoc.descriptionRegex}`);
-              }
-
-              if (amountMatch && descMatch) {
-                const amountStr = amountMatch[1].replace(/,/g, '');
-                const amount = parseFloat(amountStr);
-                // Clean description: trim, collapse spaces, and remove common trailing structural words
-                const description = descMatch[1]
-                  .replace(/\s+/g, ' ')
-                  .replace(/\s+(?:If this|on|at|from|by|at|for)\s*$/i, '')
-                  .trim();
-                
-                // We always use the date of the email as the transaction date
-                const transactionDate = date;
-
-                // Simple heuristic for type if not provided by regex
-                let type = 'debit';
-                if (regexDoc.creditRegex) {
-                  try {
-                    const creditRegex = new RegExp(regexDoc.creditRegex, 'i');
-                    const isCredit = creditRegex.test(content);
-                    console.log(`[Domain: ${domain.fromEmail}] Credit regex test: ${isCredit} (Pattern: ${regexDoc.creditRegex})`);
-                    if (isCredit) {
-                      type = 'credit';
-                    }
-                  } catch (e) {
-                    console.error(`[Domain: ${domain.fromEmail}] Invalid creditRegex: ${regexDoc.creditRegex}`);
-                  }
-                }
-
-                console.log(`Synced: ${type} of ${amount} at ${description} on ${transactionDate}`);
-
-                // Create transaction
-                await createTransaction({
-                  accountId: account._id,
-                  domainId: domain._id,
-                  userId,
-                  originalDate: transactionDate,
-                  originalDescription: description,
-                  originalAmount: amount,
-                  type,
-                });
-
-                totalSynced++;
-                wasParsed = true;
-                break; // Stop at first working regex for this email
-              }
-            } catch (error: any) {
-              console.error(`[Domain: ${domain.fromEmail}] Regex error for pattern ${regexId}:`, error.message);
-              continue; // Try next regex
+            } catch (e) {
+              console.error(`Invalid amount regex: ${amtPattern}`);
             }
           }
 
-          if (!wasParsed) {
-            console.log(`[Domain: ${domain.fromEmail}] No regex patterns matched this email.`);
+          if (amount === null) {
+            console.warn(
+              `[${domain.fromEmail}] Transaction detected but amount not extracted`
+            );
+            // Optional: store as unparsed transaction here
+            continue;
           }
+
+          // ---------- 3. MERCHANT EXTRACTION (OPTIONAL) ----------
+          let description = 'Bank Transaction';
+
+          for (const descPattern of extractionPatterns.merchantRegexes) {
+            try {
+              const match = content.match(new RegExp(descPattern, 'i'));
+              if (match && match[1]) {
+                description = match[1]
+                  .replace(/\s+/g, ' ')
+                  .trim();
+                break;
+              }
+            } catch (e) {
+              console.error(`Invalid merchant regex: ${descPattern}`);
+            }
+          }
+
+          // ---------- 4. TYPE DETECTION ----------
+          let type: 'debit' | 'credit' = 'debit';
+
+          if (
+            transactionIndicators.creditKeywords.some(k =>
+              text.includes(k.toLowerCase())
+            )
+          ) {
+            type = 'credit';
+          }
+
+          // ---------- 5. SAVE ----------
+          await createTransaction({
+            accountId: account._id,
+            domainId: domain._id,
+            userId,
+            originalDate: date, // email date
+            originalDescription: description,
+            originalAmount: amount,
+            type
+          });
+
+          totalSynced++;
+          console.log(
+            `Synced: ${type} ₹${amount} — ${description}`
+          );
         }
 
         // 6. Update sync state
@@ -271,12 +317,14 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
       }
     }
 
-    return res.status(200).json({ 
-      message: 'Sync completed successfully', 
-      transactionsSynced: totalSynced 
+    return res.status(200).json({
+      message: 'Sync completed successfully',
+      transactionsSynced: totalSynced
     });
   } catch (error) {
     console.error('Sync error:', error);
-    return res.status(500).json({ message: 'Internal server error during sync' });
+    return res.status(500).json({
+      message: 'Internal server error during sync'
+    });
   }
 };
