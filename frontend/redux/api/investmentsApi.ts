@@ -19,6 +19,7 @@ export interface HistoricalValuation {
 export interface MutualFund {
   _id: string
   name: string
+  amc: string
   isin: string
   folio: string
   type: 'Regular' | 'Direct'

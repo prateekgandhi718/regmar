@@ -65,8 +65,8 @@ const DOMAIN_MAPPING: Record<string, string> = {
   'hsbc.com': 'hsbc.com',
 }
 
+const publicKey = process.env.NEXT_PUBLIC_LOGO_DEV_KEY
 export const getLogoUrl = (emailOrDomain: string | undefined) => {
-  const publicKey = process.env.NEXT_PUBLIC_LOGO_DEV_KEY
   
   if (!emailOrDomain) {
     return `https://img.logo.dev/gmail.com?token=${publicKey}`
@@ -79,4 +79,24 @@ export const getLogoUrl = (emailOrDomain: string | undefined) => {
   const mappedDomain = DOMAIN_MAPPING[domain.toLowerCase()] || domain
   
   return `https://img.logo.dev/${mappedDomain}?token=${publicKey}`
+}
+
+export const getStockLogo = (isin?: string) => {
+  if (!isin) {
+    return `https://img.logo.dev/generic.com?token=${publicKey}`
+  }
+
+  return `https://img.logo.dev/isin/${isin}?token=${publicKey}`
+}
+
+export const getMutualFundLogo = (amc?: string) => {
+  const publicKey = process.env.NEXT_PUBLIC_LOGO_DEV_KEY
+
+  if (!amc) {
+    return `https://img.logo.dev/generic.com?token=${publicKey}`
+  }
+
+  const encoded = encodeURIComponent(amc.toLowerCase())
+
+  return `https://img.logo.dev/name/${encoded}?token=${publicKey}`
 }
