@@ -100,41 +100,6 @@ const processAccountDomains = async (
         creditKeywords
       );
 
-      // Log bucket-wise samples for debugging
-      const logDir = path.join(process.cwd(), "logs");
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir);
-      }
-      const logFilePath = path.join(logDir, "email-samples.log");
-      let logData = `\n--- BUCKET SAMPLES FOR ${emailDomain} [${new Date().toISOString()}] ---\n`;
-      
-      logData += `\n[DEBIT BUCKET]\n`;
-      debitKeywords.forEach((kw, i) => {
-        const samples = debitBuckets[i];
-        if (samples.length > 0) {
-          logData += `Keyword "${kw}": ${samples.length} samples\n`;
-          samples.forEach((s, j) => {
-            logData += `  ${j+1}: ${s.replace(/\n/g, ' ')}\n`;
-          });
-        }
-      });
-
-      logData += `\n[CREDIT BUCKET]\n`;
-      creditKeywords.forEach((kw, i) => {
-        const samples = creditBuckets[i];
-        if (samples.length > 0) {
-          logData += `Keyword "${kw}": ${samples.length} samples\n`;
-          samples.forEach((s, j) => {
-            logData += `  ${j+1}: ${s.replace(/\n/g, ' ')}\n`;
-          });
-        }
-      });
-
-      logData += `\n--- END SAMPLES ---\n`;
-      
-      fs.appendFileSync(logFilePath, logData);
-      console.log(`Diverse samples collected and logged to ${logFilePath}`);
-
       // Flatten and deduplicate
       const allSamples = [...new Set([
         ...debitBuckets.flat(),
