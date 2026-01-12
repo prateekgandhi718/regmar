@@ -34,6 +34,7 @@ export interface MutualFund {
 export interface Stock {
   _id: string
   name: string
+  ticker: string
   isin: string
   currentBalance: number
   frozenBalance: number

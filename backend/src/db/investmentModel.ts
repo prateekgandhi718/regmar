@@ -34,6 +34,7 @@ const InvestmentSchema = new mongoose.Schema({
   }],
   stocks: [{
     name: { type: String },
+    ticker: { type: String },
     isin: { type: String },
     currentBalance: { type: Number },
     frozenBalance: { type: Number },

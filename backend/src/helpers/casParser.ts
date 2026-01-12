@@ -1,3 +1,5 @@
+import { getStockByIsin } from "./stockMaster";
+
 export interface ParsedCAS {
   casId: string;
   statementPeriod: string;
@@ -28,6 +30,7 @@ export interface ParsedCAS {
   }>;
   stocks: Array<{
     name: string;
+    ticker: string;
     isin: string;
     currentBalance: number;
     frozenBalance: number;
@@ -235,9 +238,11 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
              }
              nameParts.push(parts[0].replace(isin, '').trim());
              
+             const stockMeta = getStockByIsin(isin)
              result.stocks.push({
                isin,
-               name: cleanStockName(nameParts.join(' ')),
+               name: stockMeta?.name || cleanStockName(nameParts.join(' ')),
+               ticker: stockMeta.symbol,
                currentBalance: parseAmount(parts[idxInParts + 1]),
                frozenBalance: parseAmount(parts[idxInParts + 2]),
                pledgeBalance: parseAmount(parts[idxInParts + 3]),
