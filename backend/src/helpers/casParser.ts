@@ -1,3 +1,5 @@
+import { getStockByIsin } from "./stockMaster";
+
 export interface ParsedCAS {
   casId: string;
   statementPeriod: string;
@@ -15,6 +17,7 @@ export interface ParsedCAS {
   }>;
   mutualFunds: Array<{
     name: string;
+    amc: string;
     isin: string;
     folio: string;
     type: 'Regular' | 'Direct';
@@ -27,6 +30,7 @@ export interface ParsedCAS {
   }>;
   stocks: Array<{
     name: string;
+    ticker: string;
     isin: string;
     currentBalance: number;
     frozenBalance: number;
@@ -37,18 +41,44 @@ export interface ParsedCAS {
   }>;
 }
 
+type MFMeta = {
+  amc: string;
+  scheme: string;
+  folio: string;
+};
+
+
 const parseAmount = (val: string | undefined): number => {
   if (!val || val === '--' || val.toLowerCase() === 'n.a') return 0;
   const cleaned = val.replace(/[^\d.-]/g, '').trim();
   return parseFloat(cleaned) || 0;
 };
 
-const cleanName = (name: string): string => {
+const cleanStockName = (name: string): string => {
   return name
+    // corporate action noise
+    .replace(/RS\.?\s*\d+\/-?/gi, '')
+    .replace(/WITH\s+FACE\s+VALUE.*$/gi, '')
+    .replace(/AFTER\s+(SUB[-\s]?DIVISION|SPLIT).*/gi, '')
+    .replace(/SUB[-\s]?DIVISION/gi, '')
+    .replace(/EQUITY\s+SHARES?/gi, '')
+    .replace(/FULLY\s+PAID/gi, '')
+    .replace(/NEW/gi, '')
+
+    // ordering garbage
+    .replace(/^(LIMITED|SHARES|DIVISION)\s+/gi, '')
+    .replace(/\s+(LIMITED)$/gi, ' LIMITED')
+
+    // junk symbols
+    .replace(/[^\x20-\x7E]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
+const cleanMFName = (name: string): string => {
+  return name
+    .replace(/Scheme Name\s*:/gi, '')
     .replace(/\s+/g, ' ')
-    .replace(/(?:Page \d+ of \d+|CAS ID: [A-Z0-9]+|Statement for the period|Portfolio Valuation|Portfolio Value|INR\) Loss\(%\)|Scheme Name|ISIN|Folio No\.|Bal NAV|Valuation|Invested|Profit\/Loss|Cumulative Amount|Closing Balance|Opening Balance|Transaction Description|Amount|Asset Class|Value in|Changes in|Account Details|Grand Total)/gi, '')
-    .replace(/[A-Z0-9]{12}/g, '') 
-    .replace(/\d{1,}\.\d{2,}/g, '')
     .replace(/[^\x20-\x7E]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -72,19 +102,84 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
       stocks: [],
     };
 
+    // ---- MF META LOOKUP (from MF DETAILS section) ----
+    const mfMetaByIsin: Record<string, MFMeta> = {};
+    let mfCurrentAMC = '';
+    let mfCurrentScheme = '';
+    let mfCurrentFolio = '';
+    let inMFDetailsSection = false;
+
     // 1. Metadata
     const casIdMatch = fullText.match(/CAS ID:\s*([A-Z0-9]+)/i);
     if (casIdMatch) result.casId = casIdMatch[1];
 
     const periodMatch = fullText.match(/Statement for the period from\s+(.+?)\s+to\s+(.+?)(?:\s|$)/i);
     if (periodMatch) result.statementPeriod = `${periodMatch[1]} - ${periodMatch[2]}`;
-
+    
     // 2. Section Based Parsing
     let currentSection: 'NONE' | 'HISTORICAL' | 'SUMMARY' | 'STOCKS' | 'MFS' = 'NONE';
     let lastIsinIdx = -1;
-
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      
+      // ========== MF DETAILS PARSING (METADATA EXTRACTION) ==========
+      // Check if we're entering/exiting MF details section
+      if (line.includes('MF Folios') || line.includes('AMC Name :')) {
+        inMFDetailsSection = true;
+      }
+      
+      // Reset AMC when we encounter a new AMC line
+      if (inMFDetailsSection && /^AMC Name\s*:/i.test(line)) {
+        mfCurrentAMC = line.split(':')[1]?.trim() || '';
+        // Reset scheme and folio when AMC changes
+        mfCurrentScheme = '';
+        mfCurrentFolio = '';
+        continue;
+      }
+
+      if (inMFDetailsSection && /^Scheme Name\s*:/i.test(line)) {
+        mfCurrentScheme = line.split(':')[1]?.trim() || '';
+        continue;
+      }
+
+      if (inMFDetailsSection && /^Folio No\.?\s*:/i.test(line)) {
+        mfCurrentFolio = line.split(':')[1]?.trim() || '';
+        continue;
+      }
+
+      // Look for ISIN in MF details section
+      if (inMFDetailsSection) {
+        const mfIsinMatch = line.match(/ISIN\s*:\s*(INF[A-Z0-9]{9})/i);
+        if (mfIsinMatch) {
+          const isin = mfIsinMatch[1];
+          
+          // Only store if we have all required info
+          if (mfCurrentAMC && mfCurrentScheme) {
+            mfMetaByIsin[isin] = {
+              amc: mfCurrentAMC,
+              scheme: mfCurrentScheme,
+              folio: mfCurrentFolio || '',
+            };
+            
+            // Reset scheme and folio for next MF, but keep AMC
+            mfCurrentScheme = '';
+            mfCurrentFolio = '';
+          }
+          continue;
+        }
+      }
+      
+      // Exit MF details section when we encounter other sections
+      if (inMFDetailsSection && (line.includes('DP Name :') || line.includes('NOTES TO CAS') || line.includes('SUMMARY OF INVESTMENTS'))) {
+        inMFDetailsSection = false;
+        mfCurrentAMC = '';
+        mfCurrentScheme = '';
+        mfCurrentFolio = '';
+      }
+      // ========== END MF DETAILS PARSING ==========
+
+
       const lower = line.toLowerCase();
 
       // Section Transitions
@@ -143,9 +238,11 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
              }
              nameParts.push(parts[0].replace(isin, '').trim());
              
+             const stockMeta = getStockByIsin(isin)
              result.stocks.push({
                isin,
-               name: cleanName(nameParts.join(' ')),
+               name: stockMeta?.name || cleanStockName(nameParts.join(' ')),
+               ticker: stockMeta.symbol,
                currentBalance: parseAmount(parts[idxInParts + 1]),
                frozenBalance: parseAmount(parts[idxInParts + 2]),
                pledgeBalance: parseAmount(parts[idxInParts + 3]),
@@ -162,28 +259,40 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
           const isin = isinMatch[1];
           const parts = line.split(/\s{2,}/).filter(p => p.length > 0);
           const idxInParts = parts.findIndex(p => p.includes(isin));
-
+      
           if (idxInParts !== -1 && parts.length >= idxInParts + 5) {
-             let nameParts = [];
-             for (let j = Math.max(lastIsinIdx + 1, i - 2); j < i; j++) {
-                if (!lines[j].includes('---') && !lines[j].includes('Page')) nameParts.push(lines[j]);
-             }
-             nameParts.push(parts[0].replace(isin, '').trim());
-
-             const fullName = cleanName(nameParts.join(' '));
-             result.mutualFunds.push({
-               isin,
-               name: fullName,
-               folio: parts[idxInParts + 1],
-               units: parseAmount(parts[idxInParts + 2]),
-               nav: parseAmount(parts[idxInParts + 3]),
-               investedValue: parseAmount(parts[idxInParts + 4]),
-               currentValue: parseAmount(parts[idxInParts + 5]),
-               unrealizedPnL: parseAmount(parts[idxInParts + 6]),
-               unrealizedPnLPercentage: parseAmount(parts[idxInParts + 7]),
-               type: fullName.toLowerCase().includes('direct') ? 'Direct' : 'Regular'
-             });
-             lastIsinIdx = i;
+            // Get metadata for this ISIN
+            const meta = mfMetaByIsin[isin];
+            
+            // Extract scheme name from the line
+            let schemeName = '';
+            if (meta?.scheme) {
+              // Use the scheme from metadata
+              schemeName = meta.scheme;
+            } else {
+              // Fallback: try to extract from the line
+              const nameStart = parts.slice(0, idxInParts).join(' ');
+              schemeName = cleanMFName(nameStart);
+            }
+            
+            // Determine fund type
+            const isDirect = /direct/i.test(schemeName);
+            
+            result.mutualFunds.push({
+              isin,
+              name: cleanMFName(schemeName),
+              amc: meta?.amc || '',
+              folio: meta?.folio || parts[idxInParts + 1] || '',
+              units: parseAmount(parts[idxInParts + 2]),
+              nav: parseAmount(parts[idxInParts + 3]),
+              investedValue: parseAmount(parts[idxInParts + 4]),
+              currentValue: parseAmount(parts[idxInParts + 5]),
+              unrealizedPnL: parseAmount(parts[idxInParts + 6]),
+              unrealizedPnLPercentage: parseAmount(parts[idxInParts + 7]),
+              type: isDirect ? 'Direct' : 'Regular',
+            });
+            
+            lastIsinIdx = i;
           }
         }
       }

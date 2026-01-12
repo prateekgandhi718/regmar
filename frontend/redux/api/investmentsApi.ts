@@ -19,6 +19,7 @@ export interface HistoricalValuation {
 export interface MutualFund {
   _id: string
   name: string
+  amc: string
   isin: string
   folio: string
   type: 'Regular' | 'Direct'
@@ -33,6 +34,7 @@ export interface MutualFund {
 export interface Stock {
   _id: string
   name: string
+  ticker: string
   isin: string
   currentBalance: number
   frozenBalance: number

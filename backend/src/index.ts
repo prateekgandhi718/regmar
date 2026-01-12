@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { connectDB } from './db/connection';
 import router from './router';
 import { seedCategories } from './helpers/seedCategories';
+import { loadStockMaster } from './helpers/stockMaster';
 
 dotenv.config();
 
@@ -25,6 +26,8 @@ app.use(cors({
 app.use(compression());
 app.use(cookieParser());
 app.use(express.json());
+
+loadStockMaster();
 
 const server = http.createServer(app);
 

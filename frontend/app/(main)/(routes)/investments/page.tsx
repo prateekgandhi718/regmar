@@ -21,6 +21,8 @@ import {
   EyeOff
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { StatementPeriod } from './_components/StatementPeriod'
 
 const formatCurrency = (value: number) => {
   if (value >= 10000000) {
@@ -37,6 +39,7 @@ const formatCurrency = (value: number) => {
 }
 
 const InvestmentsPage = () => {
+  const router = useRouter()
   const { data: user, isLoading: isUserLoading } = useGetMeQuery()
   const { data: investments, isLoading: isInvestmentsLoading } = useGetMyInvestmentsQuery()
   const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation()
@@ -86,12 +89,12 @@ const InvestmentsPage = () => {
       {/* Header & Greeting */}
       <div className="flex items-center justify-between px-1 pt-4">
         <div className="space-y-1">
-          <p className="text-sm font-black text-primary dark:text-white">
-            Hi, {user?.name?.split(' ')[0] || 'User'}
-          </p>
+        <p className="text-muted-foreground font-medium">Hello, {user?.name || 'User'}!</p>
+        <h1 className="text-3xl font-black tracking-tight">Your Investments Summary</h1>
           
           {hasPan && hasData && (
-            <div className="pt-6 space-y-1">
+            <div className="pt-6 space-y-4">
+              <StatementPeriod period={investments?.statementPeriod} />
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Total value</p>
               <div className="flex items-center gap-3">
                 <h1 className="text-4xl font-black tracking-tighter text-primary dark:text-white">
@@ -179,6 +182,7 @@ const InvestmentsPage = () => {
                     value={hideValues ? '••••••' : formatCurrency(summary.mfFolioValue + summary.mfDematValue)}
                     icon={<Layers className="h-7 w-7 text-orange-500" />}
                     iconBgColor="bg-orange-50 dark:bg-orange-500/10"
+                    onClick={() => router.push('/investments/mutual-funds')}
                   />
                   <SummaryCard 
                     title="Stocks"
@@ -186,6 +190,7 @@ const InvestmentsPage = () => {
                     value={hideValues ? '••••••' : formatCurrency(summary.equityValue)}
                     icon={<TrendingUp className="h-7 w-7 text-blue-500" />}
                     iconBgColor="bg-blue-50 dark:bg-blue-500/10"
+                    onClick={() => router.push('/investments/stocks')}
                   />
                 </div>
 

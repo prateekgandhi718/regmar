@@ -21,6 +21,7 @@ const InvestmentSchema = new mongoose.Schema({
   }],
   mutualFunds: [{
     name: { type: String },
+    amc: { type: String },
     isin: { type: String },
     folio: { type: String },
     type: { type: String, enum: ['Regular', 'Direct'] },
@@ -33,6 +34,7 @@ const InvestmentSchema = new mongoose.Schema({
   }],
   stocks: [{
     name: { type: String },
+    ticker: { type: String },
     isin: { type: String },
     currentBalance: { type: Number },
     frozenBalance: { type: Number },
