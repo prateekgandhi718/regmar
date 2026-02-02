@@ -27,10 +27,16 @@ export const runPortfolioOptimizer = async (
     const scriptPath = path.join(pythonFolder, 'analyze.py');
     
     // 2. Locate the Virtual Environment Python executable
-    // On Windows, it's usually .venv/Scripts/python.exe
-    // On Linux/Mac, it's usually .venv/bin/python
-    const venvPath = path.join(pythonFolder, '.venv', 'Scripts', 'python.exe');
-    const pythonExecutable = fs.existsSync(venvPath) ? venvPath : 'python'; 
+    // uv creates a standard venv at `.venv/`:
+    // - Windows: .venv/Scripts/python.exe
+    // - Linux/macOS: .venv/bin/python
+    const venvPython = process.platform === 'win32'
+      ? path.join(pythonFolder, '.venv', 'Scripts', 'python.exe')
+      : path.join(pythonFolder, '.venv', 'bin', 'python');
+
+    const pythonExecutable = fs.existsSync(venvPython)
+      ? venvPython
+      : (process.platform === 'win32' ? 'python' : 'python3');
 
     const args = [
       scriptPath,
