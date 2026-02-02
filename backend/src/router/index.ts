@@ -8,6 +8,7 @@ import ai from './ai';
 import transactions from './transactions';
 import users from './users';
 import investments from './investments';
+import optimize from './optimize';
 
 const router = express.Router();
 
@@ -21,6 +22,7 @@ export default (): express.Router => {
   transactions(router);
   users(router);
   investments(router);
+  optimize(router);
   return router;
 };
 
