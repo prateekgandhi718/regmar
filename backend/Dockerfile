@@ -1,39 +1,51 @@
-# Backend Dockerfile
-FROM node:20-alpine AS builder
+# ---------- Base image ----------
+FROM node:20-slim
 
+# ---------- Install system deps ----------
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-venv \
+    python3-dev \
+    ca-certificates \
+    curl \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# ---------- Install uv ----------
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+# ---------- Set working directory ----------
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY package-lock.json ./
-
-# Install dependencies using npm (since package-lock.json exists)
+# ---------- Copy Node files ----------
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy source code
-COPY . .
+# ---------- Copy Python files ----------
+COPY python ./python
 
-# Build TypeScript
-RUN npm run build
+# ---------- Copy equity data ----------
+COPY data ./data
 
-# Production stage
-FROM node:20-alpine
+# ---------- Create Python venv & install deps ----------
+WORKDIR /app/python/ultimate_portfolio
+RUN uv venv .venv && uv sync --frozen
 
+# ---------- Back to app root ----------
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY package-lock.json ./
+# ---------- Copy backend ----------
+COPY src ./src
+COPY tsconfig.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production
+# ---------- Build Node ----------
+RUN npm run build
 
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-
-# Expose port (Koyeb will set PORT env var)
+# ---------- Expose port ----------
 EXPOSE 5000
 
-# Start the application
-CMD ["node", "dist/index.js"]
-
+# ---------- Start server ----------
+CMD ["npm", "start"]
+    
