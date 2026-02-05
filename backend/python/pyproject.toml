@@ -9,6 +9,8 @@ dependencies = [
   "numpy",
   "PyPortfolioOpt",
   "cvxpy",
+  "fastapi",
+  "uvicorn[standard]",
 ]
 
 [tool.uv]
