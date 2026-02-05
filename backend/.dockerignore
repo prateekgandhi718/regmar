@@ -11,4 +11,4 @@ README.md
 .idea
 *.md
 .DS_Store
-python/**/.venv
+python/.venv

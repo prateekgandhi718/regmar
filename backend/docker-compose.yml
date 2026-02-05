@@ -10,3 +10,11 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    depends_on:
+      - python-backend
+
+  python-backend:
+    build: ./python
+    image: regmar-python-backend
+    container_name: regmar-python-backend
+    restart: unless-stopped
