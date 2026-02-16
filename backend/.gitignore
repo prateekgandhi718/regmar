@@ -36,3 +36,12 @@ npm-debug.log
 .venv
 
 __pycache__
+
+# Ignore ML data files (raw emails contain sensitive data)
+*.jsonl
+*.csv
+*.pkl
+*.joblib
+*.h5
+*.onnx
+models/

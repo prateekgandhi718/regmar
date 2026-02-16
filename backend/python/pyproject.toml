@@ -11,6 +11,8 @@ dependencies = [
   "cvxpy",
   "fastapi",
   "uvicorn[standard]",
+  "scikit-learn",
+  "joblib",
 ]
 
 [tool.uv]
