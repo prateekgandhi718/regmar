@@ -13,6 +13,16 @@ const TransactionSchema = new mongoose.Schema({
   type: { type: String, enum: ['credit', 'debit'], required: true },
   refunded: { type: Boolean, default: false },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+  emailBody: { type: String },
+  // Raw entity spans produced by NER (or by human annotation). Useful for UI highlighting.
+  entities: [{
+    label: { type: String },
+    start: { type: Number },
+    end: { type: Number },
+    text: { type: String },
+    // optional: user who corrected/created this span
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }],
 }, { timestamps: true });
 
 export const TransactionModel = mongoose.model('Transaction', TransactionSchema);
