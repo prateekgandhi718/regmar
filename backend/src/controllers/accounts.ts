@@ -13,62 +13,30 @@ import {
   getDomainsByAccountId,
   deleteDomainById,
   deleteDomainsByAccountId,
-  DomainModel,
 } from "../db/domainModel";
-import {
-  getParserConfigByDomain,
-  createParserConfig,
-  ParserConfigModel,
-} from "../db/parserConfigModel";
 import { deleteTransactionsByAccountId } from "../db/transactionModel";
 import { getActiveLinkedAccountByUserId } from "../db/linkedAccountModel";
 import { deleteSyncStatesByDomainId } from "../db/syncStateModel";
-import { decrypt } from "../helpers/encryption";
-import { fetchDiverseSamples } from "../helpers/imap";
-import { generateRegexFromEmailInternal } from "./ai";
 import { AuthRequest } from "../middlewares/auth";
 
 /**
  * Helper to clean up a single domain and its related data
  * - sync state
  * - domain document
- * - parser config if unused
  */
 const cleanupDomain = async (userId: string, domainId: string) => {
-  const domain = await DomainModel.findById(domainId);
-  if (!domain) return;
-
-  const parserConfigId = domain.parserConfigId?.toString();
-
   // 1. Delete sync state
   await deleteSyncStatesByDomainId(domainId);
 
   // 2. Delete domain document
   await deleteDomainById(domainId);
-
-  // 3. Delete parser config if unused by any other domain of this user
-  if (parserConfigId) {
-    const isStillUsed = await DomainModel.findOne({
-      userId,
-      parserConfigId,
-    });
-
-    if (!isStillUsed) {
-      console.log(
-        `ParserConfig ${parserConfigId} is no longer used by any domain for user ${userId}. Deleting...`
-      );
-      await ParserConfigModel.findByIdAndDelete(parserConfigId);
-    }
-  }
 };
 
 
 /**
  * Helper to process domains for an account:
- * 1. Fetches sample emails.
- * 2. Verifies them against existing regexes.
- * 3. Generates new regexes via AI for unmatched samples.
- * 4. Creates Domain documents and links them to regexes.
+ * 1. Creates Domain documents with just fromEmail.
+ * 2. ML-based classification and NER will be applied during sync.
  */
 const processAccountDomains = async (
   userId: string,
@@ -77,66 +45,19 @@ const processAccountDomains = async (
   domainNames: string[]
 ): Promise<string[]> => {
   const domainIds: string[] = [];
-  const appPassword = decrypt(linkedAccount.appPassword);
 
   for (const fromEmail of domainNames) {
     if (!fromEmail.trim()) continue;
     const emailDomain = fromEmail.trim();
-    let parserConfig = await getParserConfigByDomain(userId, emailDomain);
 
-    if (!parserConfig) {
-      console.log(`No existing regex patterns for ${emailDomain}. Fetching diverse samples for AI...`);
-
-      // BUCKET SAMPLING LOGIC
-      const debitKeywords = ["debited", "spent", "paid", "transaction", "payment", "used", "withdrawn"];
-      const creditKeywords = ["credited", "received", "deposited", "added", "refunded"];
-
-      // Fetch all buckets using a single connection to avoid "System Error (Failure)"
-      const { debitBuckets, creditBuckets } = await fetchDiverseSamples(
-        linkedAccount.email,
-        appPassword,
-        emailDomain,
-        debitKeywords,
-        creditKeywords
-      );
-
-      // Flatten and deduplicate
-      const allSamples = [...new Set([
-        ...debitBuckets.flat(),
-        ...creditBuckets.flat()
-      ])].slice(0, 20);
-
-      console.log(`Collected ${allSamples.length} diverse samples for AI generation.`);
-
-      const aiResult = await generateRegexFromEmailInternal(
-        allSamples,
-        emailDomain
-      );
-
-      if (aiResult && aiResult.transactionIndicators && aiResult.extractionPatterns) {
-        parserConfig = await createParserConfig({
-          userId,
-          domain: emailDomain,
-          transactionIndicators: aiResult.transactionIndicators,
-          extractionPatterns: aiResult.extractionPatterns,
-        });
-      } else {
-        throw new Error(
-          `Failed to generate parser config for ${fromEmail} (missing fields from LLM).`
-        );
-      }
-    } else {
-      console.log(`Using existing parser config for ${emailDomain}.`);
-    }
-
-    // Create and associate domain with parser config
+    // Create domain with just fromEmail; classifier + NER will be applied during sync
     const domain = await createDomain({
       userId,
       accountId,
       fromEmail: emailDomain,
-      parserConfigId: parserConfig._id,
     });
     domainIds.push(domain._id.toString());
+    console.log(`Created domain for ${emailDomain}`);
   }
   return domainIds;
 };

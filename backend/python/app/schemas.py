@@ -12,3 +12,31 @@ class OptimizeRequest(BaseModel):
 class OptimizeResponse(BaseModel):
     allocations: Dict[str, float]
     metrics: Dict[str, float]
+
+
+class ClassifyEmailRequest(BaseModel):
+    """Request body for email classification."""
+    email_body: str
+
+
+class ClassifyEmailResponse(BaseModel):
+    """Response for email classification."""
+    label: Optional[int]  # 0 = non-transaction, 1 = transaction
+    is_transaction: Optional[bool]
+    confidence: float
+    probabilities: Dict
+    error: Optional[str] = None
+
+
+class ClassifyTransactionTypeRequest(BaseModel):
+    """Request body for transaction type classification."""
+    email_body: str
+
+
+class ClassifyTransactionTypeResponse(BaseModel):
+    """Response for transaction type classification."""
+    label: Optional[int]  # 0 = credit, 1 = debit
+    type: Optional[str]  # 'credit' or 'debit'
+    confidence: float
+    probabilities: Dict
+    error: Optional[str] = None

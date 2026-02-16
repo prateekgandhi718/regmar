@@ -10,7 +10,6 @@ import { getUserById } from '../db/userModel';
 import { updateInvestmentByUserId, getInvestmentByUserId } from '../db/investmentModel';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import { parseCASText } from '../helpers/casParser';
-import { getParserConfigByDomain } from '../db/parserConfigModel';
 
 export const syncInvestments = async (req: AuthRequest, res: express.Response) => {
   try {
@@ -198,117 +197,43 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
 
         if (emails.length === 0) continue;
 
-        // 5. Load parser config
-        const parserConfig = await getParserConfigByDomain(userId, domain.fromEmail);
-        if (!parserConfig) {
-          console.warn(`No parser config found for ${domain.fromEmail}, skipping.`);
-          continue;
-        }
-
-        const transactionIndicators = {
-          creditKeywords: parserConfig.transactionIndicators?.creditKeywords ?? [],
-          debitKeywords: parserConfig.transactionIndicators?.debitKeywords ?? [],
-          currencyMarkers: parserConfig.transactionIndicators?.currencyMarkers ?? [],
-        }
-
-        const extractionPatterns = {
-          amountRegexes: parserConfig.extractionPatterns?.amountRegexes ?? [],
-          merchantRegexes: parserConfig.extractionPatterns?.merchantRegexes ?? [],
-        }
-
+        // 5. TODO: Call ML classifier and NER endpoints here to classify and extract entities
+        // For now, we just store the raw email body for later processing
         console.log(
           `Processing ${emails.length} emails for ${domain.fromEmail}`
         );
 
         for (const { content, date } of emails) {
           console.log(`\n--- Processing Email (${date}) ---`);
-          console.log(`RAW TEXT:\n${content}\n------------------`);
+          console.log(`RAW TEXT:\n${content.substring(0, 200)}...\n------------------`);
 
-          const text = content.toLowerCase();
+          // TODO: Call Python classifier API to check if this is a transaction email
+          // const classificationResult = await classifyEmail(content);
+          // if (!classificationResult.is_transaction) {
+          //   console.log(`[${domain.fromEmail}] Skipped (not a transaction email)`);
+          //   continue;
+          // }
 
-          // ---------- 1. CLASSIFICATION ----------
-          const hasCurrency = transactionIndicators.currencyMarkers.some(m =>
-            text.includes(m.toLowerCase())
-          );
+          // TODO: Call Python NER API to extract entities (amount, merchant, etc.)
+          // const nerResult = await extractEntities(content);
 
-          const hasAction =
-            transactionIndicators.creditKeywords.some(k =>
-              text.includes(k.toLowerCase())
-            ) ||
-            transactionIndicators.debitKeywords.some(k =>
-              text.includes(k.toLowerCase())
-            );
-
-          if (!hasCurrency || !hasAction) {
-            console.log(`[${domain.fromEmail}] Skipped (classifier: not a transaction)`);
-            continue;
-          }
-
-          // ---------- 2. AMOUNT EXTRACTION (MANDATORY) ----------
-          let amount: number | null = null;
-
-          for (const amtPattern of extractionPatterns.amountRegexes) {
-            try {
-              const match = content.match(new RegExp(amtPattern, 'i'));
-              if (match) {
-                amount = parseFloat(match[1].replace(/,/g, ''));
-                if (!isNaN(amount)) break;
-              }
-            } catch (e) {
-              console.error(`Invalid amount regex: ${amtPattern}`);
-            }
-          }
-
-          if (amount === null) {
-            console.warn(
-              `[${domain.fromEmail}] Transaction detected but amount not extracted`
-            );
-            // Optional: store as unparsed transaction here
-            continue;
-          }
-
-          // ---------- 3. MERCHANT EXTRACTION (OPTIONAL) ----------
-          let description = 'Bank Transaction';
-
-          for (const descPattern of extractionPatterns.merchantRegexes) {
-            try {
-              const match = content.match(new RegExp(descPattern, 'i'));
-              if (match && match[1]) {
-                description = match[1]
-                  .replace(/\s+/g, ' ')
-                  .trim();
-                break;
-              }
-            } catch (e) {
-              console.error(`Invalid merchant regex: ${descPattern}`);
-            }
-          }
-
-          // ---------- 4. TYPE DETECTION ----------
-          let type: 'debit' | 'credit' = 'debit';
-
-          if (
-            transactionIndicators.creditKeywords.some(k =>
-              text.includes(k.toLowerCase())
-            )
-          ) {
-            type = 'credit';
-          }
-
-          // ---------- 5. SAVE ----------
+          // For now, store the raw email without parsing
+          // This will be populated by the classifier and NER in future iterations
           await createTransaction({
             accountId: account._id,
             domainId: domain._id,
             userId,
-            originalDate: date, // email date
-            originalDescription: description,
-            originalAmount: amount,
-            type
+            emailBody: content,
+            originalDate: date,
+            originalDescription: 'Pending ML analysis',
+            originalAmount: 0,
+            type: 'debit',
+            entities: [],
           });
 
           totalSynced++;
           console.log(
-            `Synced: ${type} ₹${amount} — ${description}`
+            `Stored email for later ML processing`
           );
         }
 
@@ -328,3 +253,143 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
     });
   }
 };
+
+/**
+ * TEST ENDPOINT: Fetch sample emails from a domain and classify them using the Python ML backend.
+ * Used to validate the classifier model is working correctly.
+ */
+export const testClassifier = async (req: AuthRequest, res: express.Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.sendStatus(401);
+
+    const { domainEmail, limit = 5 } = req.body;
+    if (!domainEmail) {
+      return res.status(400).json({ message: 'domainEmail is required' });
+    }
+
+    // 1. Get Gmail account
+    const linkedAccount = await getActiveLinkedAccountByUserId(userId);
+    if (!linkedAccount || linkedAccount.provider !== 'gmail') {
+      return res.status(400).json({ message: 'Please link a Gmail account first' });
+    }
+
+    const appPassword = decrypt(linkedAccount.appPassword);
+    const email = linkedAccount.email;
+
+    // 2. Fetch sample emails from domain
+    console.log(`Fetching sample emails from ${domainEmail}...`);
+    const { emails } = await fetchEmailsIncrementally(
+      email,
+      appPassword,
+      domainEmail,
+      0, // lastUid
+      limit
+    );
+
+    if (emails.length === 0) {
+      return res.status(404).json({
+        message: `No emails found from ${domainEmail}`,
+        domain: domainEmail,
+        samplesClassified: 0,
+        results: []
+      });
+    }
+
+    // 3. Classify each email using Python ML backend
+    const pythonApiUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
+    const results: any[] = [];
+
+    for (const { content, date } of emails) {
+      try {
+        // Step 1: Classify if email is a transaction or not
+        const classifyEmailResponse = await fetch(`${pythonApiUrl}/ml/classify-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email_body: content })
+        });
+
+        if (!classifyEmailResponse.ok) {
+          console.error(`Classification failed: ${classifyEmailResponse.statusText}`);
+          results.push({
+            emailSnippet: content.substring(0, 100),
+            date,
+            error: 'Email classification failed'
+          });
+          continue;
+        }
+
+        const classificationResult = await classifyEmailResponse.json();
+        const resultEntry: any = {
+          emailSnippet: content.substring(0, 100),
+          date,
+          emailClassification: {
+            label: classificationResult.label,
+            isTransaction: classificationResult.is_transaction,
+            confidence: classificationResult.confidence,
+            probabilities: classificationResult.probabilities
+          }
+        };
+
+        console.log(
+          `Email: ${classificationResult.is_transaction ? 'TXN' : 'NON-TXN'} (conf=${classificationResult.confidence.toFixed(3)})`
+        );
+
+        // Step 2: If it's a transaction, classify the type (debit or credit)
+        if (classificationResult.is_transaction) {
+          try {
+            const typeClassifyResponse = await fetch(`${pythonApiUrl}/ml/classify-txn-type`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email_body: content })
+            });
+
+            if (typeClassifyResponse.ok) {
+              const typeClassificationResult = await typeClassifyResponse.json();
+              resultEntry.typeClassification = {
+                label: typeClassificationResult.label,
+                type: typeClassificationResult.type,
+                confidence: typeClassificationResult.confidence,
+                probabilities: typeClassificationResult.probabilities
+              };
+              console.log(
+                `  Type: ${typeClassificationResult.type?.toUpperCase()} (conf=${typeClassificationResult.confidence.toFixed(3)})`
+              );
+            } else {
+              console.warn(`Type classification failed: ${typeClassifyResponse.statusText}`);
+              resultEntry.typeClassification = {
+                error: 'Type classification failed'
+              };
+            }
+          } catch (typeErr: any) {
+            console.error(`Error classifying transaction type: ${typeErr.message}`);
+            resultEntry.typeClassification = {
+              error: typeErr.message
+            };
+          }
+        }
+
+        results.push(resultEntry);
+      } catch (err: any) {
+        console.error(`Error classifying email: ${err.message}`);
+        results.push({
+          emailSnippet: content.substring(0, 100),
+          date,
+          error: err.message
+        });
+      }
+    }
+
+    return res.status(200).json({
+      message: 'Classifier test completed',
+      domain: domainEmail,
+      samplesClassified: results.length,
+      results
+    });
+  } catch (error) {
+    console.error('Classifier test error:', error);
+    return res.status(500).json({
+      message: 'Internal server error during classifier test'
+    });
+  }
+}

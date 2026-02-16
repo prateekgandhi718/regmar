@@ -2,7 +2,7 @@ import express from 'express';
 import { AuthRequest } from '../middlewares/auth';
 
 const OPTIMIZER_BASE_URL =
-  process.env.PORTFOLIO_OPTIMIZER_URL || 'http://localhost:8000';
+  process.env.PYTHON_API_URL || 'http://localhost:8000';
 
 export const runPortfolioOptimizer = async (
   req: AuthRequest,
