@@ -39,9 +39,11 @@ __pycache__
 
 # Ignore ML data files (raw emails contain sensitive data)
 *.jsonl
+*.json
 *.csv
 *.pkl
 *.joblib
 *.h5
 *.onnx
 models/
+*.spacy
