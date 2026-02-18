@@ -367,6 +367,29 @@ export const testClassifier = async (req: AuthRequest, res: express.Response) =>
               error: typeErr.message
             };
           }
+
+          // Step 3: Extract entities (AMOUNT, MERCHANT) for transactions
+          try {
+            const extractEntitiesResponse = await fetch(`${pythonApiUrl}/ml/extract-entities`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email_body: content })
+            });
+
+            if (extractEntitiesResponse.ok) {
+              const extractEntitiesResult = await extractEntitiesResponse.json();
+              resultEntry.entities = extractEntitiesResult.entities;
+              console.log(
+                `  Entities: ${extractEntitiesResult.entities.map((e: any) => `${e.label}(${e.text})`).join(', ')}`
+              );
+            } else {
+              console.warn(`Entity extraction failed: ${extractEntitiesResponse.statusText}`);
+              resultEntry.entities = [];
+            }
+          } catch (entityErr: any) {
+            console.error(`Error extracting entities: ${entityErr.message}`);
+            resultEntry.entities = [];
+          }
         }
 
         results.push(resultEntry);

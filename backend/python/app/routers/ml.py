@@ -1,13 +1,14 @@
 """
-ML router for classifier and NER endpoints.
+ML router for classifier, type classifier, and NER endpoints.
 """
 
 from fastapi import APIRouter
 from app.schemas import (
     ClassifyEmailRequest, ClassifyEmailResponse,
-    ClassifyTransactionTypeRequest, ClassifyTransactionTypeResponse
+    ClassifyTransactionTypeRequest, ClassifyTransactionTypeResponse,
+    ExtractEntitiesRequest, ExtractEntitiesResponse
 )
-from app.controllers.ml import classify_email, classify_txn_type
+from app.controllers.ml import classify_email, classify_txn_type, extract_ner_entities
 
 router = APIRouter(prefix="/ml", tags=["ml"])
 
@@ -60,3 +61,36 @@ async def classify_txn_type_endpoint(request: ClassifyTransactionTypeRequest) ->
     """
     result = classify_txn_type(request.email_body)
     return ClassifyTransactionTypeResponse(**result)
+
+
+@router.post("/extract-entities", response_model=ExtractEntitiesResponse)
+async def extract_entities_endpoint(request: ExtractEntitiesRequest) -> ExtractEntitiesResponse:
+    """
+    Extract named entities (AMOUNT, MERCHANT) from an email.
+    
+    Request:
+        {
+            "email_body": "Dear Customer, Rs.500.00 has been debited from account to Blinkit on 18-01-26..."
+        }
+    
+    Response:
+        {
+            "text": "Dear Customer, Rs.500.00...",
+            "entities": [
+                {
+                    "text": "500.00",
+                    "label": "AMOUNT",
+                    "start": 25,
+                    "end": 31
+                },
+                {
+                    "text": "Blinkit",
+                    "label": "MERCHANT",
+                    "start": 87,
+                    "end": 94
+                }
+            ]
+        }
+    """
+    result = extract_ner_entities(request.email_body)
+    return ExtractEntitiesResponse(**result)
