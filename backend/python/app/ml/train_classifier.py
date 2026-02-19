@@ -125,7 +125,7 @@ def main():
     print(f"\n{metrics.classification_report(y_test, y_pred)}")
     
     # Save model
-    model_dir = Path(__file__).parent / 'models'
+    model_dir = Path(__file__).parent.parent / 'models'
     model_dir.mkdir(exist_ok=True)
     
     model_path = model_dir / 'email_classifier.joblib'
