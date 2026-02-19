@@ -1,23 +1,21 @@
 """
-Train a binary type classifier to distinguish debit from credit transactions.
+Train a binary classifier to distinguish transaction emails from non-transaction emails.
 
 This script:
-1. Loads the CSV data (text, label, source_domain, type)
+1. Loads the CSV data (text, label, source_domain)
 2. Splits into train/test
 3. Trains a TF-IDF + Logistic Regression pipeline
 4. Evaluates and prints metrics
 5. Saves the model and vectorizer for inference
 
 Usage:
-    python train_type_classifier.py ../data/type_classifier_data.csv
+    python train_classifier.py ../data/classifier_data.csv
 """
 
 import sys
-import os
 import json
 from pathlib import Path
 import pandas as pd
-import numpy as np
 import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -53,11 +51,10 @@ def main():
     
     # Print dataset info
     print(f"\n{'='*70}")
-    print("TYPE CLASSIFIER DATASET SUMMARY")
+    print("DATASET SUMMARY")
     print(f"{'='*70}")
     print(f"Total records: {len(df)}")
     print(f"Label distribution:\n{df['label'].value_counts()}")
-    print(f"Type distribution:\n{df['type'].value_counts()}")
     print(f"Text length stats:\n{df['text'].str.len().describe()}")
     
     # Prepare data
@@ -76,7 +73,7 @@ def main():
     
     # Build pipeline: TF-IDF + Logistic Regression
     print(f"\n{'='*70}")
-    print("TRAINING TYPE CLASSIFIER")
+    print("TRAINING CLASSIFIER")
     print(f"{'='*70}")
     
     pipeline = Pipeline([
@@ -121,24 +118,23 @@ def main():
     # Confusion matrix
     cm = metrics.confusion_matrix(y_test, y_pred)
     print(f"\nConfusion Matrix:")
-    print(f"  Credit correct (TN)={cm[0,0]}, Credit misclass as Debit (FP)={cm[0,1]}")
-    print(f"  Debit misclass as Credit (FN)={cm[1,0]}, Debit correct (TP)={cm[1,1]}")
+    print(f"  TN={cm[0,0]}, FP={cm[0,1]}")
+    print(f"  FN={cm[1,0]}, TP={cm[1,1]}")
     
     # Classification report
-    print(f"\n{metrics.classification_report(y_test, y_pred, target_names=['Credit', 'Debit'])}")
+    print(f"\n{metrics.classification_report(y_test, y_pred)}")
     
     # Save model
-    model_dir = Path(__file__).parent / 'models'
+    model_dir = Path(__file__).parent.parent / 'models'
     model_dir.mkdir(exist_ok=True)
     
-    model_path = model_dir / 'type_classifier.joblib'
+    model_path = model_dir / 'email_classifier.joblib'
     joblib.dump(pipeline, model_path)
     print(f"\n✓ Model saved to {model_path}")
     
     # Save metadata
     metadata = {
-        'model_type': 'LogisticRegression + TF-IDF (Type Classifier)',
-        'classes': ['credit', 'debit'],
+        'model_type': 'LogisticRegression + TF-IDF',
         'accuracy': float(accuracy),
         'precision': float(precision),
         'recall': float(recall),
@@ -150,7 +146,7 @@ def main():
         'label_distribution': df['label'].value_counts().to_dict(),
     }
     
-    metadata_path = model_dir / 'type_classifier_metadata.json'
+    metadata_path = model_dir / 'classifier_metadata.json'
     with open(metadata_path, 'w') as f:
         json.dump(metadata, f, indent=2)
     print(f"✓ Metadata saved to {metadata_path}")

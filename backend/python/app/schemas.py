@@ -40,3 +40,23 @@ class ClassifyTransactionTypeResponse(BaseModel):
     confidence: float
     probabilities: Dict
     error: Optional[str] = None
+
+
+class EntityData(BaseModel):
+    """Single extracted entity."""
+    text: str
+    label: str  # 'AMOUNT' or 'MERCHANT'
+    start: int
+    end: int
+
+
+class ExtractEntitiesRequest(BaseModel):
+    """Request body for NER entity extraction."""
+    email_body: str
+
+
+class ExtractEntitiesResponse(BaseModel):
+    """Response for NER entity extraction."""
+    text: str
+    entities: List[EntityData]
+    error: Optional[str] = None
