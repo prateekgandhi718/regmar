@@ -21,7 +21,7 @@ def load_type_classifier_model():
     if _model_loaded:
         return _type_classifier_model
     
-    model_path = Path(__file__).parent.parent / 'models' / 'type_classifier.joblib'
+    model_path = Path(__file__).parent / 'models' / 'type_classifier.joblib'
     
     if not model_path.exists():
         logger.warning(f"Type classifier model not found at {model_path}")

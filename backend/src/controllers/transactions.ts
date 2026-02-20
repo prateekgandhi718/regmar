@@ -1,5 +1,5 @@
 import express from 'express';
-import { TransactionModel, updateTransactionById, deleteTransactionById, getTransactionsByUserId } from '../db/transactionModel';
+import { updateTransactionById, deleteTransactionById, getTransactionsByUserId } from '../db/transactionModel';
 import { AuthRequest } from '../middlewares/auth';
 
 export const getUserTransactions = async (req: AuthRequest, res: express.Response) => {

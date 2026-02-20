@@ -1,36 +1,72 @@
 import { createApi } from '@reduxjs/toolkit/query/react'
 import { baseQueryWithReauth } from './baseQuery'
 
+export interface Domain {
+  _id: string
+  userId: string
+  accountId: string
+  fromEmail: string
+  createdAt: string
+  updatedAt: string
+  __v: number
+}
+
+export interface Account {
+  _id: string
+  userId: string
+  title: string
+  currency: string
+  accountNumber: string
+  domainIds: Domain[]
+  createdAt: string
+  updatedAt: string
+  __v: number
+}
+
+export interface EntityData {
+  _id: string
+  label: string
+  start: number
+  end: number
+  text: string
+}
+
 export interface Transaction {
   _id: string
-  accountId: {
-    _id: string
-    title: string
-    accountNumber: string
-    icon?: string
-    domainIds: {
-      _id: string
-      fromEmail: string
-    }[]
-  }
+
+  accountId: Account
+  domainId: Domain
+
   userId: string
+
   originalDate: string
-  newDate?: string
   originalDescription: string
-  newDescription?: string
   originalAmount: number
-  newAmount?: number
+
+  // ML classification
   type: 'credit' | 'debit'
+  typeConfidence: number
+  nerModel: string
+  entities: EntityData[]
+
   refunded: boolean
+  emailBody: string
+
+  createdAt: string
+  updatedAt: string
+
+  // editable fields
+  newDate?: string
+  newDescription?: string
+  newAmount?: number
   categoryId?: {
     _id: string
     name: string
     emoji: string
     color?: string
   }
-  createdAt: string
-  updatedAt: string
 }
+
 
 export const transactionsApi = createApi({
   reducerPath: 'transactionsApi',

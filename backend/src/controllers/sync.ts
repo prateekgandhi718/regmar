@@ -1,17 +1,30 @@
-import express from 'express';
-import { AuthRequest } from '../middlewares/auth';
-import { getActiveLinkedAccountByUserId } from '../db/linkedAccountModel';
-import { getAccountsByUserId } from '../db/accountModel';
-import { getSyncState, updateSyncState } from '../db/syncStateModel';
-import { createTransaction } from '../db/transactionModel';
-import { decrypt } from '../helpers/encryption';
-import { fetchEmailsIncrementally, fetchLatestEmailWithAttachment } from '../helpers/imap';
-import { getUserById } from '../db/userModel';
-import { updateInvestmentByUserId, getInvestmentByUserId } from '../db/investmentModel';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
-import { parseCASText } from '../helpers/casParser';
+import express from "express";
+import { AuthRequest } from "../middlewares/auth";
+import { getActiveLinkedAccountByUserId } from "../db/linkedAccountModel";
+import { getAccountsByUserId } from "../db/accountModel";
+import { getSyncState, updateSyncState } from "../db/syncStateModel";
+import { createTransaction } from "../db/transactionModel";
+import { decrypt } from "../helpers/encryption";
+import {
+  fetchEmailsIncrementally,
+  fetchLatestEmailWithAttachment,
+} from "../helpers/imap";
+import { getUserById } from "../db/userModel";
+import {
+  updateInvestmentByUserId,
+  getInvestmentByUserId,
+} from "../db/investmentModel";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import { parseCASText } from "../helpers/casParser";
+import { ClassifyEmailResponse, ClassifyTransactionTypeResponse, EntityData, ExtractEntitiesResponse, TestResultEntry } from "../helpers/syncTransactions";
 
-export const syncInvestments = async (req: AuthRequest, res: express.Response) => {
+const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000";
+const nerModelName: string | undefined = process.env.NER_MODEL_NAME || "v1";
+
+export const syncInvestments = async (
+  req: AuthRequest,
+  res: express.Response,
+) => {
   try {
     const userId = req.userId;
     if (!userId) return res.sendStatus(401);
@@ -19,13 +32,17 @@ export const syncInvestments = async (req: AuthRequest, res: express.Response) =
     // 1. Get user and PAN
     const user = await getUserById(userId);
     if (!user || !user.pan) {
-      return res.status(400).json({ message: 'PAN number not found. Please update your profile.' });
+      return res
+        .status(400)
+        .json({ message: "PAN number not found. Please update your profile." });
     }
 
     // 2. Get active Gmail link
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
-    if (!linkedAccount || linkedAccount.provider !== 'gmail') {
-      return res.status(400).json({ message: 'Please link a Gmail account first' });
+    if (!linkedAccount || linkedAccount.provider !== "gmail") {
+      return res
+        .status(400)
+        .json({ message: "Please link a Gmail account first" });
     }
 
     const appPassword = decrypt(linkedAccount.appPassword);
@@ -35,22 +52,24 @@ export const syncInvestments = async (req: AuthRequest, res: express.Response) =
     const { attachment, date, uid } = await fetchLatestEmailWithAttachment(
       email,
       appPassword,
-      'ecas@cdslstatement.com',
-      '.pdf'
+      "ecas@cdslstatement.com",
+      ".pdf",
     );
 
     if (!attachment) {
-      return res.status(404).json({ message: 'No CAS statement found in your emails.' });
+      return res
+        .status(404)
+        .json({ message: "No CAS statement found in your emails." });
     }
 
     // 3.1 Check if this email has already been synced
     const currentInvestment = await getInvestmentByUserId(userId);
     if (currentInvestment && currentInvestment.lastSyncedEmailUid === uid) {
-      return res.status(200).json({ 
-        message: 'Your investment portfolio is already up to date.',
+      return res.status(200).json({
+        message: "Your investment portfolio is already up to date.",
         lastSyncedAt: currentInvestment.lastSyncedAt,
         summary: currentInvestment.summary,
-        alreadySynced: true
+        alreadySynced: true,
       });
     }
 
@@ -64,18 +83,18 @@ export const syncInvestments = async (req: AuthRequest, res: express.Response) =
       });
 
       const pdfDocument = await loadingTask.promise;
-      
+
       console.log(`Successfully unlocked PDF with PAN: ${user.pan}`);
 
-      let fullText = '';
+      let fullText = "";
       for (let i = 1; i <= pdfDocument.numPages; i++) {
         const page = await pdfDocument.getPage(i);
         const textContent = await page.getTextContent();
-        
+
         // Group items by their vertical position (y-coordinate) to form lines
         const items = textContent.items as any[];
         const lines: { [key: number]: any[] } = {};
-        
+
         items.forEach((item) => {
           const y = Math.round(item.transform[5]); // Round to handle small offsets
           if (!lines[y]) lines[y] = [];
@@ -83,13 +102,17 @@ export const syncInvestments = async (req: AuthRequest, res: express.Response) =
         });
 
         // Sort lines from top to bottom, and items within each line from left to right
-        const sortedY = Object.keys(lines).map(Number).sort((a, b) => b - a);
-        const pageText = sortedY.map((y) => {
-          return lines[y]
-            .sort((a, b) => a.transform[4] - b.transform[4])
-            .map((item) => item.str)
-            .join(' ');
-        }).join('\n');
+        const sortedY = Object.keys(lines)
+          .map(Number)
+          .sort((a, b) => b - a);
+        const pageText = sortedY
+          .map((y) => {
+            return lines[y]
+              .sort((a, b) => a.transform[4] - b.transform[4])
+              .map((item) => item.str)
+              .join(" ");
+          })
+          .join("\n");
 
         fullText += `\n--- Page ${i} ---\n${pageText}\n`;
       }
@@ -97,9 +120,11 @@ export const syncInvestments = async (req: AuthRequest, res: express.Response) =
       // Use manual parser to analyze the text
       const parsedData = parseCASText(fullText);
       if (!parsedData) {
-        return res.status(500).json({ message: 'Failed to parse statement content' });
+        return res
+          .status(500)
+          .json({ message: "Failed to parse statement content" });
       }
-      
+
       // 5. Update investment record
       await updateInvestmentByUserId(userId, {
         pan: user.pan,
@@ -113,34 +138,45 @@ export const syncInvestments = async (req: AuthRequest, res: express.Response) =
         stocks: parsedData.stocks,
       });
 
-      return res.status(200).json({ 
-        message: 'Statement synced and analyzed successfully',
+      return res.status(200).json({
+        message: "Statement synced and analyzed successfully",
         lastSyncedAt: date || new Date(),
-        summary: parsedData.summary
+        summary: parsedData.summary,
       });
     } catch (pdfError: any) {
-      if (pdfError.name === 'PasswordException') {
-        return res.status(400).json({ message: 'Failed to unlock PDF. Please check if your PAN is correct.' });
+      if (pdfError.name === "PasswordException") {
+        return res
+          .status(400)
+          .json({
+            message:
+              "Failed to unlock PDF. Please check if your PAN is correct.",
+          });
       }
-      console.error('PDF Processing Error:', pdfError);
+      console.error("PDF Processing Error:", pdfError);
       throw pdfError;
     }
-
   } catch (error) {
-    console.error('Investment sync error:', error);
-    return res.status(500).json({ message: 'Internal server error during investment sync' });
+    console.error("Investment sync error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error during investment sync" });
   }
 };
 
-export const syncAccountTransactions = async (req: AuthRequest, res: express.Response) => {
+export const syncAccountTransactions = async (
+  req: AuthRequest,
+  res: express.Response,
+) => {
   try {
     const userId = req.userId;
     if (!userId) return res.sendStatus(401);
 
     // 1. Active Gmail link
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
-    if (!linkedAccount || linkedAccount.provider !== 'gmail') {
-      return res.status(400).json({ message: 'Please link a Gmail account first' });
+    if (!linkedAccount || linkedAccount.provider !== "gmail") {
+      return res
+        .status(400)
+        .json({ message: "Please link a Gmail account first" });
     }
 
     const appPassword = decrypt(linkedAccount.appPassword);
@@ -149,12 +185,13 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
     // 2. Accounts with domains
     const accounts = await getAccountsByUserId(userId);
     const accountsWithDomains = accounts.filter(
-      acc => acc.domainIds && acc.domainIds.length > 0
+      (acc) => acc.domainIds && acc.domainIds.length > 0,
     );
 
     if (accountsWithDomains.length === 0) {
       return res.status(400).json({
-        message: 'No bank accounts with transaction domains found. Please add an account first.'
+        message:
+          "No bank accounts with transaction domains found. Please add an account first.",
       });
     }
 
@@ -170,20 +207,17 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
 
         if (lastUid === 0) {
           const now = new Date();
-        
+
           // Move to first day of current month
           now.setDate(1);
           now.setHours(0, 0, 0, 0);
-        
-          // Go back one month
-          now.setMonth(now.getMonth() - 1);
-        
+
           since = now;
-        
+
           console.log(
-            `Initial sync for ${domain.fromEmail}, fetching since ${since.toISOString()}`
+            `Initial sync for ${domain.fromEmail}, fetching since ${since.toISOString()}`,
           );
-        }        
+        }
 
         // 4. Fetch emails
         const { emails, lastUid: newLastUid } = await fetchEmailsIncrementally(
@@ -192,49 +226,145 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
           domain.fromEmail,
           lastUid,
           undefined,
-          since
+          since,
         );
 
         if (emails.length === 0) continue;
 
-        // 5. TODO: Call ML classifier and NER endpoints here to classify and extract entities
-        // For now, we just store the raw email body for later processing
         console.log(
-          `Processing ${emails.length} emails for ${domain.fromEmail}`
+          `Processing ${emails.length} emails for ${domain.fromEmail}`,
         );
 
         for (const { content, date } of emails) {
           console.log(`\n--- Processing Email (${date}) ---`);
-          console.log(`RAW TEXT:\n${content.substring(0, 200)}...\n------------------`);
-
-          // TODO: Call Python classifier API to check if this is a transaction email
-          // const classificationResult = await classifyEmail(content);
-          // if (!classificationResult.is_transaction) {
-          //   console.log(`[${domain.fromEmail}] Skipped (not a transaction email)`);
-          //   continue;
-          // }
-
-          // TODO: Call Python NER API to extract entities (amount, merchant, etc.)
-          // const nerResult = await extractEntities(content);
-
-          // For now, store the raw email without parsing
-          // This will be populated by the classifier and NER in future iterations
-          await createTransaction({
-            accountId: account._id,
-            domainId: domain._id,
-            userId,
-            emailBody: content,
-            originalDate: date,
-            originalDescription: 'Pending ML analysis',
-            originalAmount: 0,
-            type: 'debit',
-            entities: [],
-          });
-
-          totalSynced++;
           console.log(
-            `Stored email for later ML processing`
+            `RAW TEXT:\n${content.substring(0, 200)}...\n------------------`,
           );
+
+          // 1. Classify whether this is a transaction email
+          let isTransaction = false;
+          let classificationResult: ClassifyEmailResponse | null = null;
+          try {
+            const resp = await fetch(`${pythonApiUrl}/ml/classify-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email_body: content }),
+            });
+            if (resp.ok) {
+              classificationResult =
+                (await resp.json()) as ClassifyEmailResponse;
+              isTransaction = !!classificationResult.is_transaction;
+            } else {
+              console.warn(`Email classification failed: ${resp.statusText}`);
+            }
+          } catch (err: any) {
+            console.error(`Error calling classify-email: ${err.message}`);
+          }
+
+          if (!isTransaction) {
+            console.log(
+              `[${domain.fromEmail}] Skipped (not a transaction email)`,
+            );
+            continue;
+          }
+
+          // 2. Classify transaction type (debit/credit)
+          let txnType: "debit" | "credit" = "debit";
+          let typeConfidence: number | undefined = undefined;
+          try {
+            const resp = await fetch(`${pythonApiUrl}/ml/classify-txn-type`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email_body: content }),
+            });
+            if (resp.ok) {
+              const tr = (await resp.json()) as ClassifyTransactionTypeResponse;
+              if (tr?.type) txnType = tr.type;
+              if (typeof tr?.confidence === "number")
+                typeConfidence = tr.confidence;
+              console.log(
+                `Type classification: ${txnType} (conf=${typeConfidence})`,
+              );
+            } else {
+              console.warn(`Type classification failed: ${resp.statusText}`);
+            }
+          } catch (err: any) {
+            console.error(`Error calling classify-txn-type: ${err.message}`);
+          }
+
+          // 3. Extract entities via NER
+          let processedEntities: EntityData[] = [];
+          try {
+            const resp = await fetch(`${pythonApiUrl}/ml/extract-entities`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email_body: content }),
+            });
+            if (resp.ok) {
+              const ner = (await resp.json()) as ExtractEntitiesResponse;
+              processedEntities = Array.isArray(ner.entities)
+                ? ner.entities
+                : [];
+            } else {
+              console.warn(`Entity extraction failed: ${resp.statusText}`);
+            }
+          } catch (err: any) {
+            console.error(`Error calling extract-entities: ${err.message}`);
+          }
+
+          // 4. Derive amount and description from NER entities
+          let originalAmount = 0;
+          let originalDescription = content.substring(0, 10);
+          try {
+            // NER labels from Python are 'AMOUNT' and 'MERCHANT'
+            const amtEntity = processedEntities.find((e) =>
+              /AMOUNT/i.test(e.label || ""),
+            ) as EntityData | undefined;
+            if (amtEntity?.text) {
+              const raw = amtEntity.text;
+
+              let cleaned = raw
+                .replace(/(rs\.?|inr|\$)/gi, "") // remove currency tokens
+                .replace(/,/g, "") // remove thousand separators
+                .trim();
+
+              const match = cleaned.match(/-?\d+(\.\d+)?/);
+
+              if (match) {
+                const parsed = parseFloat(match[0]);
+                if (!Number.isNaN(parsed)) originalAmount = parsed;
+              }
+            }
+
+            const merchantEntity = processedEntities.find((e) =>
+              /MERCHANT/i.test(e.label || ""),
+            ) as EntityData | undefined;
+            if (merchantEntity && merchantEntity.text)
+              originalDescription = merchantEntity.text;
+          } catch (err) {
+            // keep defaults on errors
+          }
+
+          // 5. Persist transaction with model outputs
+          try {
+            await createTransaction({
+              accountId: account._id,
+              domainId: domain._id,
+              userId,
+              emailBody: content,
+              originalDate: date,
+              originalDescription,
+              originalAmount,
+              type: txnType,
+              typeConfidence,
+              entities: processedEntities,
+              nerModel: nerModelName,
+            });
+            totalSynced++;
+            console.log("Stored transaction with ML analysis");
+          } catch (err: any) {
+            console.error(`Error saving transaction: ${err.message}`);
+          }
         }
 
         // 6. Update sync state
@@ -243,13 +373,13 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
     }
 
     return res.status(200).json({
-      message: 'Sync completed successfully',
-      transactionsSynced: totalSynced
+      message: "Sync completed successfully",
+      transactionsSynced: totalSynced,
     });
   } catch (error) {
-    console.error('Sync error:', error);
+    console.error("Sync error:", error);
     return res.status(500).json({
-      message: 'Internal server error during sync'
+      message: "Internal server error during sync",
     });
   }
 };
@@ -258,20 +388,25 @@ export const syncAccountTransactions = async (req: AuthRequest, res: express.Res
  * TEST ENDPOINT: Fetch sample emails from a domain and classify them using the Python ML backend.
  * Used to validate the classifier model is working correctly.
  */
-export const testClassifier = async (req: AuthRequest, res: express.Response) => {
+export const testClassifier = async (
+  req: AuthRequest,
+  res: express.Response,
+) => {
   try {
     const userId = req.userId;
     if (!userId) return res.sendStatus(401);
 
     const { domainEmail, limit = 5 } = req.body;
     if (!domainEmail) {
-      return res.status(400).json({ message: 'domainEmail is required' });
+      return res.status(400).json({ message: "domainEmail is required" });
     }
 
     // 1. Get Gmail account
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
-    if (!linkedAccount || linkedAccount.provider !== 'gmail') {
-      return res.status(400).json({ message: 'Please link a Gmail account first' });
+    if (!linkedAccount || linkedAccount.provider !== "gmail") {
+      return res
+        .status(400)
+        .json({ message: "Please link a Gmail account first" });
     }
 
     const appPassword = decrypt(linkedAccount.appPassword);
@@ -284,7 +419,7 @@ export const testClassifier = async (req: AuthRequest, res: express.Response) =>
       appPassword,
       domainEmail,
       0, // lastUid
-      limit
+      limit,
     );
 
     if (emails.length === 0) {
@@ -292,98 +427,118 @@ export const testClassifier = async (req: AuthRequest, res: express.Response) =>
         message: `No emails found from ${domainEmail}`,
         domain: domainEmail,
         samplesClassified: 0,
-        results: []
+        results: [],
       });
     }
 
     // 3. Classify each email using Python ML backend
-    const pythonApiUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
-    const results: any[] = [];
+    const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000";
+    const results: TestResultEntry[] = [];
 
     for (const { content, date } of emails) {
       try {
         // Step 1: Classify if email is a transaction or not
-        const classifyEmailResponse = await fetch(`${pythonApiUrl}/ml/classify-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email_body: content })
-        });
+        const classifyEmailResponse = await fetch(
+          `${pythonApiUrl}/ml/classify-email`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email_body: content }),
+          },
+        );
 
         if (!classifyEmailResponse.ok) {
-          console.error(`Classification failed: ${classifyEmailResponse.statusText}`);
+          console.error(
+            `Classification failed: ${classifyEmailResponse.statusText}`,
+          );
           results.push({
             emailSnippet: content.substring(0, 100),
             date,
-            error: 'Email classification failed'
+            error: "Email classification failed",
           });
           continue;
         }
 
-        const classificationResult = await classifyEmailResponse.json();
-        const resultEntry: any = {
+        const classificationResult =
+          (await classifyEmailResponse.json()) as ClassifyEmailResponse;
+        const resultEntry: TestResultEntry = {
           emailSnippet: content.substring(0, 100),
           date,
           emailClassification: {
             label: classificationResult.label,
             isTransaction: classificationResult.is_transaction,
             confidence: classificationResult.confidence,
-            probabilities: classificationResult.probabilities
-          }
+            probabilities: classificationResult.probabilities,
+          },
         };
 
         console.log(
-          `Email: ${classificationResult.is_transaction ? 'TXN' : 'NON-TXN'} (conf=${classificationResult.confidence.toFixed(3)})`
+          `Email: ${classificationResult.is_transaction ? "TXN" : "NON-TXN"} (conf=${classificationResult.confidence.toFixed(3)})`,
         );
 
         // Step 2: If it's a transaction, classify the type (debit or credit)
         if (classificationResult.is_transaction) {
           try {
-            const typeClassifyResponse = await fetch(`${pythonApiUrl}/ml/classify-txn-type`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email_body: content })
-            });
+            const typeClassifyResponse = await fetch(
+              `${pythonApiUrl}/ml/classify-txn-type`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email_body: content }),
+              },
+            );
 
             if (typeClassifyResponse.ok) {
-              const typeClassificationResult = await typeClassifyResponse.json();
+              const typeClassificationResult =
+                (await typeClassifyResponse.json()) as ClassifyTransactionTypeResponse;
               resultEntry.typeClassification = {
                 label: typeClassificationResult.label,
                 type: typeClassificationResult.type,
                 confidence: typeClassificationResult.confidence,
-                probabilities: typeClassificationResult.probabilities
+                probabilities: typeClassificationResult.probabilities,
               };
               console.log(
-                `  Type: ${typeClassificationResult.type?.toUpperCase()} (conf=${typeClassificationResult.confidence.toFixed(3)})`
+                `  Type: ${typeClassificationResult.type?.toUpperCase()} (conf=${typeClassificationResult.confidence.toFixed(3)})`,
               );
             } else {
-              console.warn(`Type classification failed: ${typeClassifyResponse.statusText}`);
+              console.warn(
+                `Type classification failed: ${typeClassifyResponse.statusText}`,
+              );
               resultEntry.typeClassification = {
-                error: 'Type classification failed'
+                error: "Type classification failed",
               };
             }
           } catch (typeErr: any) {
-            console.error(`Error classifying transaction type: ${typeErr.message}`);
+            console.error(
+              `Error classifying transaction type: ${typeErr.message}`,
+            );
             resultEntry.typeClassification = {
-              error: typeErr.message
+              error: typeErr.message,
             };
           }
 
           // Step 3: Extract entities (AMOUNT, MERCHANT) for transactions
           try {
-            const extractEntitiesResponse = await fetch(`${pythonApiUrl}/ml/extract-entities`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email_body: content })
-            });
+            const extractEntitiesResponse = await fetch(
+              `${pythonApiUrl}/ml/extract-entities`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email_body: content }),
+              },
+            );
 
             if (extractEntitiesResponse.ok) {
-              const extractEntitiesResult = await extractEntitiesResponse.json();
+              const extractEntitiesResult =
+                (await extractEntitiesResponse.json()) as ExtractEntitiesResponse;
               resultEntry.entities = extractEntitiesResult.entities;
               console.log(
-                `  Entities: ${extractEntitiesResult.entities.map((e: any) => `${e.label}(${e.text})`).join(', ')}`
+                `  Entities: ${extractEntitiesResult.entities.map((e: EntityData) => `${e.label}(${e.text})`).join(", ")}`,
               );
             } else {
-              console.warn(`Entity extraction failed: ${extractEntitiesResponse.statusText}`);
+              console.warn(
+                `Entity extraction failed: ${extractEntitiesResponse.statusText}`,
+              );
               resultEntry.entities = [];
             }
           } catch (entityErr: any) {
@@ -398,21 +553,21 @@ export const testClassifier = async (req: AuthRequest, res: express.Response) =>
         results.push({
           emailSnippet: content.substring(0, 100),
           date,
-          error: err.message
+          error: err.message,
         });
       }
     }
 
     return res.status(200).json({
-      message: 'Classifier test completed',
+      message: "Classifier test completed",
       domain: domainEmail,
       samplesClassified: results.length,
-      results
+      results,
     });
   } catch (error) {
-    console.error('Classifier test error:', error);
+    console.error("Classifier test error:", error);
     return res.status(500).json({
-      message: 'Internal server error during classifier test'
+      message: "Internal server error during classifier test",
     });
   }
-}
+};

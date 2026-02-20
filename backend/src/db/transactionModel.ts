@@ -11,10 +11,13 @@ const TransactionSchema = new mongoose.Schema({
   originalAmount: { type: Number, required: true },
   newAmount: { type: Number },
   type: { type: String, enum: ['credit', 'debit'], required: true },
+  typeConfidence: { type: Number },
   refunded: { type: Boolean, default: false },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
   emailBody: { type: String },
-  // Raw entity spans produced by NER (or by human annotation). Useful for UI highlighting.
+  // optional: which NER model produced the entities (name/version)
+  nerModel: { type: String },
+  // entities extracted by NER -- include model confidence and model name
   entities: [{
     label: { type: String },
     start: { type: Number },
