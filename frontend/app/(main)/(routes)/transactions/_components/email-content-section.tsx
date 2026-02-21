@@ -3,26 +3,78 @@
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { EntityData } from '@/redux/api/transactionsApi'
+import { useSaveNerFeedbackMutation } from '@/redux/api/nerFeedbackApi'
 
 interface Props {
   emailBody: string
   entities?: EntityData[]
-  truncateLength?: number
+  transactionId: string
+  nerModelVersion?: string
+}
+
+type EditableEntity = {
+  label: 'AMOUNT' | 'MERCHANT'
+  start: number
+  end: number
+  text: string
 }
 
 export const EmailContentSection = ({
   emailBody,
   entities = [],
-  truncateLength = 180,
+  transactionId,
+  nerModelVersion,
 }: Props) => {
   const [expanded, setExpanded] = useState(false)
+  const [userEntities, setUserEntities] = useState<EditableEntity[]>(
+    entities.map(e => ({
+      label: e.label as any,
+      start: e.start,
+      end: e.end,
+      text: e.text,
+    }))
+  )
+
+  const [saveFeedback, { isLoading }] = useSaveNerFeedbackMutation()
+
+  /*
+  -------------------------
+  TEXT SELECTION HANDLER
+  -------------------------
+  */
+
+  const handleSelection = () => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed) return
+
+    const text = sel.toString()
+    if (!text.trim()) return
+
+    const start = emailBody.indexOf(text)
+    if (start === -1) return
+
+    const end = start + text.length
+
+    const label = window.prompt('Label this selection: AMOUNT or MERCHANT')
+
+    if (label !== 'AMOUNT' && label !== 'MERCHANT') return
+
+    setUserEntities(prev => [
+      ...prev,
+      { label, start, end, text },
+    ])
+
+    sel.removeAllRanges()
+  }
+
+  /*
+  -------------------------
+  HIGHLIGHT RENDERING
+  -------------------------
+  */
 
   const highlighted = useMemo(() => {
-    if (!emailBody) return null
-
-    const sorted = [...entities]
-      .filter(e => e.label === 'AMOUNT' || e.label === 'MERCHANT')
-      .sort((a, b) => a.start - b.start)
+    const sorted = [...userEntities].sort((a, b) => a.start - b.start)
 
     const nodes: React.ReactNode[] = []
     let cursor = 0
@@ -40,7 +92,13 @@ export const EmailContentSection = ({
       nodes.push(
         <span
           key={i}
-          className={`px-1 rounded font-bold ${color}`}
+          className={`px-1 rounded font-bold cursor-pointer ${color}`}
+          onClick={() =>
+            setUserEntities(prev =>
+              prev.filter((_, idx) => idx !== i)
+            )
+          }
+          title="Click to remove"
         >
           {emailBody.slice(entity.start, entity.end)}
         </span>
@@ -54,41 +112,65 @@ export const EmailContentSection = ({
     }
 
     return nodes
-  }, [emailBody, entities])
+  }, [emailBody, userEntities])
 
-  const isLong = emailBody.length > truncateLength
-  const displayText =
-    !expanded && isLong
-      ? emailBody.slice(0, truncateLength)
-      : null
+  /*
+  -------------------------
+  SAVE FEEDBACK
+  -------------------------
+  */
+
+  const save = async () => {
+    try {
+      await saveFeedback({
+        transactionId,
+        emailText: emailBody,
+        modelEntities: entities,
+        correctedEntities: userEntities,
+        nerModelVersion,
+      }).unwrap()
+
+      alert('Feedback saved!')
+    } catch {
+      alert('Failed to save feedback')
+    }
+  }
+
+  const isLong = emailBody.length > 180
 
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">
-        Email Content
+        Email Content (Editable)
       </p>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-border/40 text-sm leading-relaxed whitespace-pre-wrap">
-        {!expanded && isLong ? (
-          <>
-            {displayText}…
-          </>
-        ) : (
-          highlighted
+      <div
+        onMouseUp={handleSelection}
+        className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-border/40 text-sm whitespace-pre-wrap select-text cursor-text"
+      >
+        {!expanded && isLong
+          ? emailBody.slice(0, 180) + '…'
+          : highlighted}
+      </div>
+
+      <div className="flex justify-between">
+        {isLong && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setExpanded(v => !v)}
+          >
+            {expanded ? 'Show less' : 'Show more'}
+          </Button>
         )}
 
-        {isLong && (
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setExpanded(v => !v)}
-              className="font-bold text-xs uppercase text-primary"
-            >
-              {expanded ? 'Show less' : 'Show more'}
-            </Button>
-          </div>
-        )}
+        <Button
+          size="sm"
+          onClick={save}
+          disabled={isLoading}
+        >
+          Save Feedback
+        </Button>
       </div>
     </div>
   )
