@@ -104,7 +104,10 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
           </div>
 
           {/* Email content section  */}
-          <EmailContentSection emailBody={transaction.emailBody} entities={transaction.entities} transactionId={transaction._id} />
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Email Content</p>
+          <EmailContentSection emailBody={transaction.emailBody} entities={transaction.entities} transactionId={transaction._id} correctedEntities={transaction.correctedEntities} />
+            </div>
         </div>
 
         {/* Footer Buttons */}

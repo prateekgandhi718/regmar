@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { NerTrainingModel } from './nerTrainingModel';
 
 const TransactionSchema = new mongoose.Schema({
   accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
@@ -48,3 +49,27 @@ export const updateTransactionById = (id: string, values: Record<string, any>) =
   .populate('domainId');
 export const deleteTransactionById = (id: string) => TransactionModel.findByIdAndDelete(id);
 export const deleteTransactionsByAccountId = (accountId: string) => TransactionModel.deleteMany({ accountId });
+
+export const getLatestCorrectionsForTransactions = async (
+  transactionIds: string[]
+) => {
+  const docs = await NerTrainingModel.find(
+    {
+      transactionId: {
+        $in: transactionIds.map(id => new mongoose.Types.ObjectId(id)),
+      },
+    },
+    {
+      transactionId: 1,
+      correctedEntities: 1,
+    }
+  ).lean()
+
+  const map = new Map<string, typeof docs[number]['correctedEntities']>()
+
+  docs.forEach(doc => {
+    map.set(doc.transactionId.toString(), doc.correctedEntities)
+  })
+
+  return map
+}

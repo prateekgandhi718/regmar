@@ -49,6 +49,8 @@ export interface Transaction {
   nerModel: string
   entities: EntityData[]
 
+  correctedEntities: EntityData[] | null
+
   refunded: boolean
   emailBody: string
 
@@ -66,7 +68,6 @@ export interface Transaction {
     color?: string
   }
 }
-
 
 export const transactionsApi = createApi({
   reducerPath: 'transactionsApi',
