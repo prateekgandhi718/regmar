@@ -8,11 +8,31 @@ const NerEntitySchema = new mongoose.Schema({
 });
 
 const NerTrainingSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+  transactionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Transaction', required: true, unique: true},
+
   emailText: { type: String, required: true },
-  entities: [NerEntitySchema],
+
+  modelEntities: [NerEntitySchema], // what model predicted
+  correctedEntities: [NerEntitySchema], // what user fixed
+
+  nerModelVersion: { type: String }, // model used at time
+
+  source: {
+    type: String,
+    enum: ['user_feedback', 'manual_seed'],
+    default: 'user_feedback',
+  },
+
+  reviewed: { type: Boolean, default: false }, // future moderation
+
 }, { timestamps: true });
 
-export const NerTrainingModel = mongoose.model('NerTraining', NerTrainingSchema);
+export const NerTrainingModel = mongoose.model(
+  'NerTraining',
+  NerTrainingSchema
+);
 
-export const createNerTraining = (values: Record<string, any>) => new NerTrainingModel(values).save();
-export const appendNerTraining = (values: Record<string, any>) => new NerTrainingModel(values).save();
+export const createNerTraining = (values: Record<string, any>) =>
+  new NerTrainingModel(values).save();

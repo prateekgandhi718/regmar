@@ -9,6 +9,7 @@ import transactions from './transactions';
 import users from './users';
 import investments from './investments';
 import optimize from './optimize';
+import nerTraining from './nerFeedback';
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ export default (): express.Router => {
   users(router);
   investments(router);
   optimize(router);
+  nerTraining(router);
   return router;
 };
 

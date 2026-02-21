@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { EmailContentSection } from './email-content-section'
 
 interface QuickTagDrawerProps {
   transaction: Transaction | null
@@ -84,6 +85,12 @@ export const QuickTagDrawer = ({ transaction, isOpen, onClose }: QuickTagDrawerP
                 ))}
               </div>
             )}
+
+            {/* Email content section  */}
+            <div className="space-y-6">
+            <h3 className="text-base font-black uppercase tracking-widest text-foreground">Email Content</h3>
+            <EmailContentSection emailBody={transaction.emailBody} entities={transaction.entities} transactionId={transaction._id} correctedEntities={transaction.correctedEntities}/>
+            </div>
           </div>
         </div>
       </DrawerContent>

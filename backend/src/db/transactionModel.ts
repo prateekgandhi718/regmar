@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { NerTrainingModel } from './nerTrainingModel';
 
 const TransactionSchema = new mongoose.Schema({
   accountId: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
@@ -11,10 +12,13 @@ const TransactionSchema = new mongoose.Schema({
   originalAmount: { type: Number, required: true },
   newAmount: { type: Number },
   type: { type: String, enum: ['credit', 'debit'], required: true },
+  typeConfidence: { type: Number },
   refunded: { type: Boolean, default: false },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
   emailBody: { type: String },
-  // Raw entity spans produced by NER (or by human annotation). Useful for UI highlighting.
+  // optional: which NER model produced the entities (name/version)
+  nerModel: { type: String },
+  // entities extracted by NER -- include model confidence and model name
   entities: [{
     label: { type: String },
     start: { type: Number },
@@ -45,3 +49,27 @@ export const updateTransactionById = (id: string, values: Record<string, any>) =
   .populate('domainId');
 export const deleteTransactionById = (id: string) => TransactionModel.findByIdAndDelete(id);
 export const deleteTransactionsByAccountId = (accountId: string) => TransactionModel.deleteMany({ accountId });
+
+export const getLatestCorrectionsForTransactions = async (
+  transactionIds: string[]
+) => {
+  const docs = await NerTrainingModel.find(
+    {
+      transactionId: {
+        $in: transactionIds.map(id => new mongoose.Types.ObjectId(id)),
+      },
+    },
+    {
+      transactionId: 1,
+      correctedEntities: 1,
+    }
+  ).lean()
+
+  const map = new Map<string, typeof docs[number]['correctedEntities']>()
+
+  docs.forEach(doc => {
+    map.set(doc.transactionId.toString(), doc.correctedEntities)
+  })
+
+  return map
+}

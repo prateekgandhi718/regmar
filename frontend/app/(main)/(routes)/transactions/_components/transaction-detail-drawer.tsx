@@ -10,6 +10,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import { EditTransactionDrawer } from './edit-transaction-drawer'
 import { getLogoUrl } from '@/lib/logos'
+import { EmailContentSection } from './email-content-section'
 
 interface TransactionDetailDrawerProps {
   transaction: Transaction | null
@@ -33,8 +34,8 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
     }
   }
 
-  const fromEmail = transaction.accountId?.domainIds?.[0]?.fromEmail || 'gmail.com'
-  const domainName = fromEmail.split('@')[1] || 'gmail.com'
+  const fromEmail = transaction.accountId?.domainIds?.[0]?.fromEmail
+  const domainName = fromEmail.split('@')[1]
   const logoUrl = getLogoUrl(domainName)
 
   return (
@@ -101,6 +102,12 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
               </div>
             </div>
           </div>
+
+          {/* Email content section  */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Email Content</p>
+          <EmailContentSection emailBody={transaction.emailBody} entities={transaction.entities} transactionId={transaction._id} correctedEntities={transaction.correctedEntities} />
+            </div>
         </div>
 
         {/* Footer Buttons */}

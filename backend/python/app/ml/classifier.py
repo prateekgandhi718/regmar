@@ -20,7 +20,7 @@ def load_classifier_model():
     if _model_loaded:
         return _classifier_model
     
-    model_path = Path(__file__).parent.parent / 'models' / 'email_classifier.joblib'
+    model_path = Path(__file__).parent / 'models' / 'email_classifier.joblib'
     
     if not model_path.exists():
         logger.warning(f"Classifier model not found at {model_path}")

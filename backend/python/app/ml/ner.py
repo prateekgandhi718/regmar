@@ -19,7 +19,7 @@ def load_ner_model():
     if _model_loaded:
         return _ner_model
     
-    model_path = Path(__file__).parent.parent / 'models' / 'model-best'
+    model_path = Path(__file__).parent / 'models' / 'model-best'
     
     if not model_path.exists():
         logger.warning(f"NER model not found at {model_path}")

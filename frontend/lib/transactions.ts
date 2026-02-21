@@ -29,4 +29,3 @@ export const calculateTotals = (transactions: Transaction[]) => {
 
   return { totalExpenses, totalInvestments }
 }
-

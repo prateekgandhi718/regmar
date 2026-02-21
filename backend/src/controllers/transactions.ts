@@ -1,20 +1,38 @@
 import express from 'express';
-import { TransactionModel, updateTransactionById, deleteTransactionById, getTransactionsByUserId } from '../db/transactionModel';
+import { updateTransactionById, deleteTransactionById, getTransactionsByUserId, getLatestCorrectionsForTransactions } from '../db/transactionModel';
 import { AuthRequest } from '../middlewares/auth';
 
-export const getUserTransactions = async (req: AuthRequest, res: express.Response) => {
+export const getUserTransactions = async (
+  req: AuthRequest,
+  res: express.Response
+) => {
   try {
-    const userId = req.userId;
-    if (!userId) return res.sendStatus(401);
+    const userId = req.userId
+    if (!userId) return res.sendStatus(401)
 
-    const transactions = await getTransactionsByUserId(userId);
-    
-    return res.status(200).json(transactions);
+    const transactions = await getTransactionsByUserId(userId)
+
+    const transactionIds = transactions.map(t => t._id.toString())
+
+    const correctionMap =
+      await getLatestCorrectionsForTransactions(transactionIds)
+
+    const enriched = transactions.map(t => {
+      const corrected = correctionMap.get(t._id.toString())
+
+      return {
+        ...t.toObject(),
+        correctedEntities: corrected || null,
+      }
+    })
+
+    return res.status(200).json(enriched)
+
   } catch (error) {
-    console.error(error);
-    return res.sendStatus(400);
+    console.error(error)
+    return res.sendStatus(400)
   }
-};
+}
 
 export const updateTransaction = async (req: AuthRequest, res: express.Response) => {
   try {

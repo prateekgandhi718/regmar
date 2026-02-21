@@ -24,7 +24,9 @@ export const TransactionItem = ({ transaction, onClick, onTagClick }: Transactio
             <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">{transaction.accountId?.title}</p>
           </div>
         </div>
-        <span className={`text-lg font-black whitespace-nowrap ${isDebit ? 'text-primary' : 'text-emerald-500'}`}>₹{transaction.originalAmount.toLocaleString('en-IN')}</span>
+        <span className={`text-lg font-black whitespace-nowrap ${isDebit ? 'text-primary' : 'text-emerald-500'}`}>
+          ₹{transaction.newAmount?.toLocaleString('en-IN') || transaction.originalAmount.toLocaleString('en-IN')}
+        </span>
       </div>
 
       {!isTagged && (
