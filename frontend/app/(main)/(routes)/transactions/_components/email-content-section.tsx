@@ -172,9 +172,9 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
         })),
         nerModelVersion,
       }).unwrap()
-      toast.success('Feedback successfully saved!')
+      toast.success('Feedback successfully saved!', { position: "bottom-center" })
     } catch {
-      toast.error('Failed to save feedback. Please try again.')
+      toast.error('Failed to save feedback.',  { position: "bottom-center" })
     }
   }
 

@@ -25,7 +25,10 @@ const NerTrainingSchema = new mongoose.Schema({
     default: 'user_feedback',
   },
 
-  reviewed: { type: Boolean, default: false }, // future moderation
+  reviewed: { type: Boolean, default: false },
+
+  usedForTraining: { type: Boolean, default: false },
+  trainedAt: { type: Date, default: null },
 
 }, { timestamps: true });
 

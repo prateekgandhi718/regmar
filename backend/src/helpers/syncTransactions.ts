@@ -24,6 +24,7 @@ export interface EntityData {
 export interface ExtractEntitiesResponse {
   text: string;
   entities: EntityData[];
+  model_version?: string;
   error?: string | null;
 }
 

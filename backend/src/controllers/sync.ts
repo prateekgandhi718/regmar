@@ -16,10 +16,15 @@ import {
 } from "../db/investmentModel";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 import { parseCASText } from "../helpers/casParser";
-import { ClassifyEmailResponse, ClassifyTransactionTypeResponse, EntityData, ExtractEntitiesResponse, TestResultEntry } from "../helpers/syncTransactions";
+import {
+  ClassifyEmailResponse,
+  ClassifyTransactionTypeResponse,
+  EntityData,
+  ExtractEntitiesResponse,
+  TestResultEntry,
+} from "../helpers/syncTransactions";
 
 const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000";
-const nerModelName: string | undefined = process.env.NER_MODEL_NAME || "v1";
 
 export const syncInvestments = async (
   req: AuthRequest,
@@ -145,12 +150,9 @@ export const syncInvestments = async (
       });
     } catch (pdfError: any) {
       if (pdfError.name === "PasswordException") {
-        return res
-          .status(400)
-          .json({
-            message:
-              "Failed to unlock PDF. Please check if your PAN is correct.",
-          });
+        return res.status(400).json({
+          message: "Failed to unlock PDF. Please check if your PAN is correct.",
+        });
       }
       console.error("PDF Processing Error:", pdfError);
       throw pdfError;
@@ -294,6 +296,7 @@ export const syncAccountTransactions = async (
 
           // 3. Extract entities via NER
           let processedEntities: EntityData[] = [];
+          let nerModelName: string | undefined = undefined;
           try {
             const resp = await fetch(`${pythonApiUrl}/ml/extract-entities`, {
               method: "POST",
@@ -305,6 +308,7 @@ export const syncAccountTransactions = async (
               processedEntities = Array.isArray(ner.entities)
                 ? ner.entities
                 : [];
+              nerModelName = ner.model_version;
             } else {
               console.warn(`Entity extraction failed: ${resp.statusText}`);
             }
