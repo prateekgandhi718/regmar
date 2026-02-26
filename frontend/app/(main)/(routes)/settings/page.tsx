@@ -111,9 +111,11 @@ const SettingsPage = () => {
                 id="gmail-password"
                 type="password"
                 placeholder="16-character app password"
-                maxLength={16}
                 value={appPassword}
-                onChange={(e) => setAppPassword(e.target.value)}
+                onChange={(e) => {
+                  const normalized = e.target.value.replace(/\s+/g, '')
+                  setAppPassword(normalized.slice(0, 16))
+                }}
                 onFocus={() => {
                   if (isPasswordPrefilled) {
                     setAppPassword('')
@@ -158,10 +160,9 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-12 pb-24">
-      <div className="space-y-2 px-1">
-        <p className="text-muted-foreground font-medium">Manage your preferences</p>
-        <h1 className="text-3xl font-black tracking-tight text-primary dark:text-white">Settings</h1>
+    <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-black tracking-tight">Settings</h1>
       </div>
 
       {/* Email Integration Widget */}
@@ -257,7 +258,7 @@ const SettingsPage = () => {
 
       {/* Account Widget */}
       <div className="space-y-6">
-        <h2 className="text-xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
+        <h2 className="text-3xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
           <User className="h-5 w-5" />
           Account
         </h2>
@@ -268,8 +269,8 @@ const SettingsPage = () => {
 
           <div className="flex items-center gap-6 relative z-10 min-w-0">
             <div className="space-y-1 min-w-0">
-              <p className="text-2xl font-black tracking-tight text-primary dark:text-white truncate">{user?.name || 'Member'}</p>
-              <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest truncate">{user?.email}</p>
+              <p className="font-bold text-lg text-primary dark:text-white truncate">{user?.name || 'Member'}</p>
+              <p className="text-sm font-medium text-muted-foreground truncate">{user?.email}</p>
             </div>
           </div>
 

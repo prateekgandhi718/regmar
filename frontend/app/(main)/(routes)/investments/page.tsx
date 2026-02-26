@@ -9,10 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SummaryCard } from '@/components/investments/SummaryCard'
 import { HistoricalChart } from '@/components/investments/HistoricalChart'
-import { Loader2, ShieldCheck, RefreshCw, CheckCircle2, AlertCircle, Layers, TrendingUp, Eye, EyeOff } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Loader2, ShieldCheck, RefreshCw, Layers, TrendingUp, Eye, EyeOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { StatementPeriod } from './_components/StatementPeriod'
+import { toast } from 'sonner'
 
 const formatCurrency = (value: number) => {
   if (value >= 10000000) return `₹${(value / 10000000).toFixed(2)}Cr`
@@ -35,7 +35,6 @@ const InvestmentsPage = () => {
   const [syncInvestments, { isLoading: isSyncing }] = useSyncInvestmentsMutation()
 
   const [panInput, setPanInput] = useState<string | null>(null)
-  const [syncStatus, setSyncStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
   const [hideValues, setHideValues] = useState(false)
 
   if (isUserLoading || isInvestmentsLoading) {
@@ -63,16 +62,11 @@ const InvestmentsPage = () => {
   }
 
   const handleSync = async () => {
-    setSyncStatus({ type: null, message: '' })
-
     try {
       const result = await syncInvestments().unwrap()
-      setSyncStatus({ type: 'success', message: result.message })
+      toast.success(result.message)
     } catch (error: any) {
-      setSyncStatus({
-        type: 'error',
-        message: error?.data?.message || 'Failed to sync investments',
-      })
+      toast.error(error?.data?.message || 'Failed to sync investments')
     }
   }
 
@@ -138,7 +132,13 @@ const InvestmentsPage = () => {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black">Your summary</h2>
 
-            <Button variant="ghost" size="sm" onClick={handleSync} disabled={isSyncing}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4"
+            >
               {isSyncing ? <Loader2 className="animate-spin mr-2" /> : <RefreshCw className="mr-2" />}
               Sync
             </Button>
@@ -164,7 +164,7 @@ const InvestmentsPage = () => {
                 onClick={() => router.push('/investments/stocks')}
               />
 
-              {investments.historicalValuation?.length > 0 && <HistoricalChart data={investments.historicalValuation} hideValues={hideValues} />}
+              {investments.historicalValuation?.length > 0 && <HistoricalChart data={investments.historicalValuation} />}
             </>
           ) : (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-4xl">
@@ -173,18 +173,6 @@ const InvestmentsPage = () => {
             </div>
           )}
 
-          {syncStatus.type && (
-            <div
-              className={cn(
-                'p-4 rounded-xl flex items-center gap-3 border',
-                syncStatus.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700',
-              )}
-            >
-              {syncStatus.type === 'success' ? <CheckCircle2 /> : <AlertCircle />}
-
-              <p className="text-xs font-bold uppercase">{syncStatus.message}</p>
-            </div>
-          )}
         </div>
       )}
     </div>

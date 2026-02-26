@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Transaction } from '@/redux/api/transactionsApi'
 import {
   format,
@@ -32,11 +33,12 @@ import { isExpense, getTransactionAmount } from '@/lib/transactions'
 
 interface HomeSummaryProps {
   transactions: Transaction[]
+  action?: ReactNode
 }
 
 type Period = 'today' | 'week' | 'month'
 
-export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
+export const HomeSummary = ({ transactions, action }: HomeSummaryProps) => {
   const user = useSelector(selectCurrentUser)
   const [period, setPeriod] = useState<Period>('month')
   const { theme } = useTheme()
@@ -232,9 +234,12 @@ export const HomeSummary = ({ transactions }: HomeSummaryProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 px-1">
+      <div className="space-y-5 px-1">
         <p className="text-muted-foreground font-medium">Hello, {user?.name || 'User'}!</p>
-        <h1 className="text-3xl font-black tracking-tight">Your Summary</h1>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-3xl font-black tracking-tight">Your Summary</h1>
+          {action}
+        </div>
       </div>
 
       <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-8 relative overflow-hidden group shadow-sm">

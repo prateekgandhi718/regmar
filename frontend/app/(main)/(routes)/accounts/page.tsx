@@ -36,7 +36,7 @@ const AccountsPage = () => {
     <div className="flex flex-col min-h-screen pb-20 bg-background">
       <AccountsHeader search={search} setSearch={setSearch} onAdd={handleAdd} />
 
-      <div className="flex-1 px-4 mt-6 space-y-6 overflow-y-auto">
+      <div className="flex-1 px-6 space-y-6 overflow-y-auto">
         <SetupPrompts />
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
