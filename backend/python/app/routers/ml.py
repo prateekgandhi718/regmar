@@ -6,9 +6,9 @@ from fastapi import APIRouter
 from app.schemas import (
     ClassifyEmailRequest, ClassifyEmailResponse,
     ClassifyTransactionTypeRequest, ClassifyTransactionTypeResponse,
-    ExtractEntitiesRequest, ExtractEntitiesResponse
+    ExtractEntitiesRequest, ExtractEntitiesResponse, RetrainNerRequest, RetrainNerResponse
 )
-from app.controllers.ml import classify_email, classify_txn_type, extract_ner_entities
+from app.controllers.ml import classify_email, classify_txn_type, extract_ner_entities, retrain_ner_model
 
 router = APIRouter(prefix="/ml", tags=["ml"])
 
@@ -94,3 +94,11 @@ async def extract_entities_endpoint(request: ExtractEntitiesRequest) -> ExtractE
     """
     result = extract_ner_entities(request.email_body)
     return ExtractEntitiesResponse(**result)
+
+@router.post("/retrain", response_model=RetrainNerResponse)
+async def retrain_endpoint(request: RetrainNerRequest) -> RetrainNerResponse:
+    """
+    Append new NER samples and retrain spaCy model.
+    """
+    result = retrain_ner_model(request.samples)
+    return RetrainNerResponse(**result)

@@ -148,7 +148,7 @@ cd backend
 python python/scripts/convert_labelstudio_to_spacy_direct.py
 ```
 
-**Output**: `ml_data/ner_spacy.jsonl`
+**Output**: `python/app/ml/data/ner_spacy.jsonl`
 
 ### Step 3C: Create DocBin from JSONL
 

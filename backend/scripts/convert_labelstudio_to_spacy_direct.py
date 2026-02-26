@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 IN_FILE = Path('ml_data/ner_mvp_annotated_dataset.json')
-OUT_FILE = Path('python/app/data/ner_spacy.jsonl')
+OUT_FILE = Path('python/app/ml/data/ner_spacy.jsonl')
 OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 with IN_FILE.open('r') as f:

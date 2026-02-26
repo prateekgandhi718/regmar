@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -59,4 +59,18 @@ class ExtractEntitiesResponse(BaseModel):
     """Response for NER entity extraction."""
     text: str
     entities: List[EntityData]
+    model_version: Optional[str] = None
     error: Optional[str] = None
+
+# schemas for retraining.
+class NerTrainingSample(BaseModel):
+    text: str
+    entities: List[Tuple[int, int, str]]
+
+class RetrainNerRequest(BaseModel):
+    samples: List[NerTrainingSample]
+
+class RetrainNerResponse(BaseModel):
+    success: bool
+    samples_added: int
+    message: str
