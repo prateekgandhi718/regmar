@@ -13,6 +13,9 @@ const TransactionSchema = new mongoose.Schema({
   newAmount: { type: Number },
   type: { type: String, enum: ['credit', 'debit'], required: true },
   typeConfidence: { type: Number },
+  isTransactionConfidence: { type: Number },
+  userType: { type: String, enum: ['credit', 'debit'] },
+  isProcessed: { type: Boolean, required: true },
   refunded: { type: Boolean, default: false },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
   emailBody: { type: String },
@@ -32,13 +35,17 @@ const TransactionSchema = new mongoose.Schema({
 export const TransactionModel = mongoose.model('Transaction', TransactionSchema);
 
 export const getTransactionsByAccountId = (accountId: string) => TransactionModel.find({ accountId }).populate('categoryId');
-export const getTransactionsByUserId = (userId: string) => TransactionModel.find({ userId })
+export const getTransactionsByUserId = (userId: string) => TransactionModel.find({ userId, isProcessed: true })
   .populate('categoryId')
   .populate({
     path: 'accountId',
     populate: { path: 'domainIds' }
   })
   .populate('domainId');
+export const getUnprocessedTransactionsByUserAndDomain = (
+  userId: string,
+  domainId: string
+) => TransactionModel.find({ userId, domainId, isProcessed: false });
 export const createTransaction = (values: Record<string, any>) => new TransactionModel(values).save();
 export const updateTransactionById = (id: string, values: Record<string, any>) => TransactionModel.findByIdAndUpdate(id, values, { new: true })
   .populate('categoryId')

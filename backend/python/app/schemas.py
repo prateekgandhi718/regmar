@@ -74,3 +74,31 @@ class RetrainNerResponse(BaseModel):
     success: bool
     samples_added: int
     message: str
+
+# schemas for classifier retraining.
+class ClassifierTrainingSample(BaseModel):
+    text: str
+    label: int
+    source_domain: str
+
+class TypeClassifierTrainingSample(BaseModel):
+    text: str
+    label: int
+    source_domain: str
+    type: str  # 'credit' or 'debit'
+
+class RetrainClassifierRequest(BaseModel):
+    samples: List[ClassifierTrainingSample]
+
+class RetrainClassifierResponse(BaseModel):
+    success: bool
+    samples_added: int
+    message: str
+
+class RetrainTypeClassifierRequest(BaseModel):
+    samples: List[TypeClassifierTrainingSample]
+
+class RetrainTypeClassifierResponse(BaseModel):
+    success: bool
+    samples_added: int
+    message: str

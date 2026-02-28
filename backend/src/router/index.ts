@@ -10,6 +10,7 @@ import users from './users';
 import investments from './investments';
 import optimize from './optimize';
 import nerTraining from './nerFeedback';
+import txnClassifier from './txnClassifier';
 
 const router = express.Router();
 
@@ -25,6 +26,6 @@ export default (): express.Router => {
   investments(router);
   optimize(router);
   nerTraining(router);
+  txnClassifier(router);
   return router;
 };
-

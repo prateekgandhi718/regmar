@@ -3,7 +3,12 @@ import { AuthRequest } from "../middlewares/auth";
 import { getActiveLinkedAccountByUserId } from "../db/linkedAccountModel";
 import { getAccountsByUserId } from "../db/accountModel";
 import { getSyncState, updateSyncState } from "../db/syncStateModel";
-import { createTransaction } from "../db/transactionModel";
+import {
+  createTransaction,
+  deleteTransactionById,
+  getUnprocessedTransactionsByUserAndDomain,
+  updateTransactionById,
+} from "../db/transactionModel";
 import { decrypt } from "../helpers/encryption";
 import {
   fetchEmailsIncrementally,
@@ -16,15 +21,8 @@ import {
 } from "../db/investmentModel";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 import { parseCASText } from "../helpers/casParser";
-import {
-  ClassifyEmailResponse,
-  ClassifyTransactionTypeResponse,
-  EntityData,
-  ExtractEntitiesResponse,
-  TestResultEntry,
-} from "../helpers/syncTransactions";
-
-const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000";
+import { ClassifyEmailResponse, ClassifyTransactionTypeResponse, EntityData, ExtractEntitiesResponse, TestResultEntry } from "../helpers/syncTransactions";
+import { processEmailWithPython } from "../helpers/txnProcessing";
 
 export const syncInvestments = async (
   req: AuthRequest,
@@ -231,148 +229,145 @@ export const syncAccountTransactions = async (
           since,
         );
 
-        if (emails.length === 0) continue;
-
-        console.log(
-          `Processing ${emails.length} emails for ${domain.fromEmail}`,
-        );
-
-        for (const { content, date } of emails) {
-          console.log(`\n--- Processing Email (${date}) ---`);
+        if (emails.length > 0) {
           console.log(
-            `RAW TEXT:\n${content.substring(0, 200)}...\n------------------`,
+            `Processing ${emails.length} emails for ${domain.fromEmail}`,
           );
 
-          // 1. Classify whether this is a transaction email
-          let isTransaction = false;
-          let classificationResult: ClassifyEmailResponse | null = null;
-          try {
-            const resp = await fetch(`${pythonApiUrl}/ml/classify-email`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email_body: content }),
-            });
-            if (resp.ok) {
-              classificationResult =
-                (await resp.json()) as ClassifyEmailResponse;
-              isTransaction = !!classificationResult.is_transaction;
-            } else {
-              console.warn(`Email classification failed: ${resp.statusText}`);
+          for (const { content, date } of emails) {
+            console.log(`\n--- Processing Email (${date}) ---`);
+            console.log(
+              `RAW TEXT:\n${content.substring(0, 200)}...\n------------------`,
+            );
+
+            const result = await processEmailWithPython(content);
+
+            if (result.status === "unavailable") {
+              // Store raw email for later processing when Python is available
+              try {
+                await createTransaction({
+                  accountId: account._id,
+                  domainId: domain._id,
+                  userId,
+                  emailBody: content,
+                  originalDate: date,
+                  originalDescription: content.substring(0, 10),
+                  originalAmount: 0,
+                  type: "debit",
+                  isProcessed: false,
+                });
+                console.log("Stored unprocessed transaction (Python unavailable)");
+              } catch (err: any) {
+                console.error(`Error saving unprocessed transaction: ${err.message}`);
+              }
+              continue;
             }
-          } catch (err: any) {
-            console.error(`Error calling classify-email: ${err.message}`);
+
+            if (result.status === "non_transaction") {
+              console.log(
+                `[${domain.fromEmail}] Skipped (not a transaction email)`,
+              );
+              continue;
+            }
+
+            const {
+              txnType,
+              typeConfidence,
+              isTransactionConfidence,
+              processedEntities,
+              nerModelName,
+              originalAmount,
+              originalDescription,
+            } = result.data;
+
+            // 5. Persist transaction with model outputs
+            try {
+              await createTransaction({
+                accountId: account._id,
+                domainId: domain._id,
+                userId,
+                emailBody: content,
+                originalDate: date,
+                originalDescription,
+                originalAmount,
+                type: txnType,
+                typeConfidence,
+                isTransactionConfidence,
+                entities: processedEntities,
+                nerModel: nerModelName,
+                isProcessed: true,
+              });
+              totalSynced++;
+              console.log("Stored transaction with ML analysis");
+            } catch (err: any) {
+              console.error(`Error saving transaction: ${err.message}`);
+            }
           }
 
-          if (!isTransaction) {
-            console.log(
-              `[${domain.fromEmail}] Skipped (not a transaction email)`,
+          // 6. Update sync state
+          await updateSyncState(userId, domain._id.toString(), newLastUid);
+        }
+
+        // 7. Process unprocessed transactions already stored for this domain
+        const pendingTransactions =
+          await getUnprocessedTransactionsByUserAndDomain(
+            userId,
+            domain._id.toString(),
+          );
+
+        if (pendingTransactions.length > 0) {
+          console.log(
+            `Reprocessing ${pendingTransactions.length} pending transactions for ${domain.fromEmail}`,
+          );
+        }
+
+        for (const pending of pendingTransactions) {
+          if (!pending.emailBody) {
+            console.warn(
+              `Pending transaction ${pending._id} has no email body; skipping`,
             );
             continue;
           }
 
-          // 2. Classify transaction type (debit/credit)
-          let txnType: "debit" | "credit" = "debit";
-          let typeConfidence: number | undefined = undefined;
-          try {
-            const resp = await fetch(`${pythonApiUrl}/ml/classify-txn-type`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email_body: content }),
-            });
-            if (resp.ok) {
-              const tr = (await resp.json()) as ClassifyTransactionTypeResponse;
-              if (tr?.type) txnType = tr.type;
-              if (typeof tr?.confidence === "number")
-                typeConfidence = tr.confidence;
-              console.log(
-                `Type classification: ${txnType} (conf=${typeConfidence})`,
-              );
-            } else {
-              console.warn(`Type classification failed: ${resp.statusText}`);
-            }
-          } catch (err: any) {
-            console.error(`Error calling classify-txn-type: ${err.message}`);
+          const result = await processEmailWithPython(pending.emailBody);
+
+          if (result.status === "unavailable") {
+            continue;
           }
 
-          // 3. Extract entities via NER
-          let processedEntities: EntityData[] = [];
-          let nerModelName: string | undefined = undefined;
-          try {
-            const resp = await fetch(`${pythonApiUrl}/ml/extract-entities`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email_body: content }),
-            });
-            if (resp.ok) {
-              const ner = (await resp.json()) as ExtractEntitiesResponse;
-              processedEntities = Array.isArray(ner.entities)
-                ? ner.entities
-                : [];
-              nerModelName = ner.model_version;
-            } else {
-              console.warn(`Entity extraction failed: ${resp.statusText}`);
-            }
-          } catch (err: any) {
-            console.error(`Error calling extract-entities: ${err.message}`);
+          if (result.status === "non_transaction") {
+            await deleteTransactionById(pending._id.toString());
+            continue;
           }
 
-          // 4. Derive amount and description from NER entities
-          let originalAmount = 0;
-          let originalDescription = content.substring(0, 10);
+          const {
+            txnType,
+            typeConfidence,
+            isTransactionConfidence,
+            processedEntities,
+            nerModelName,
+            originalAmount,
+            originalDescription,
+          } = result.data;
+
           try {
-            // NER labels from Python are 'AMOUNT' and 'MERCHANT'
-            const amtEntity = processedEntities.find((e) =>
-              /AMOUNT/i.test(e.label || ""),
-            ) as EntityData | undefined;
-            if (amtEntity?.text) {
-              const raw = amtEntity.text;
-
-              let cleaned = raw
-                .replace(/(rs\.?|inr|\$)/gi, "") // remove currency tokens
-                .replace(/,/g, "") // remove thousand separators
-                .trim();
-
-              const match = cleaned.match(/-?\d+(\.\d+)?/);
-
-              if (match) {
-                const parsed = parseFloat(match[0]);
-                if (!Number.isNaN(parsed)) originalAmount = parsed;
-              }
-            }
-
-            const merchantEntity = processedEntities.find((e) =>
-              /MERCHANT/i.test(e.label || ""),
-            ) as EntityData | undefined;
-            if (merchantEntity && merchantEntity.text)
-              originalDescription = merchantEntity.text;
-          } catch (err) {
-            // keep defaults on errors
-          }
-
-          // 5. Persist transaction with model outputs
-          try {
-            await createTransaction({
-              accountId: account._id,
-              domainId: domain._id,
-              userId,
-              emailBody: content,
-              originalDate: date,
+            await updateTransactionById(pending._id.toString(), {
               originalDescription,
               originalAmount,
               type: txnType,
               typeConfidence,
+              isTransactionConfidence,
               entities: processedEntities,
               nerModel: nerModelName,
+              isProcessed: true,
             });
             totalSynced++;
-            console.log("Stored transaction with ML analysis");
           } catch (err: any) {
-            console.error(`Error saving transaction: ${err.message}`);
+            console.error(
+              `Error updating pending transaction ${pending._id}: ${err.message}`,
+            );
           }
         }
-
-        // 6. Update sync state
-        await updateSyncState(userId, domain._id.toString(), newLastUid);
       }
     }
 

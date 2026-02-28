@@ -8,6 +8,7 @@ import { transactionsApi } from './api/transactionsApi'
 import { categoriesApi } from './api/categoriesApi'
 import { investmentsApi } from './api/investmentsApi'
 import { nerTrainingApi } from './api/nerFeedbackApi'
+import { txnClassifierApi } from './api/txnClassifierApi'
 import authReducer from './features/authSlice'
 
 export const store = configureStore({
@@ -21,6 +22,7 @@ export const store = configureStore({
     [categoriesApi.reducerPath]: categoriesApi.reducer,
     [investmentsApi.reducerPath]: investmentsApi.reducer,
     [nerTrainingApi.reducerPath]: nerTrainingApi.reducer,
+    [txnClassifierApi.reducerPath]: txnClassifierApi.reducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
   middleware: (getDefaultMiddleware) =>
@@ -33,6 +35,7 @@ export const store = configureStore({
       categoriesApi.middleware,
       investmentsApi.middleware,
       nerTrainingApi.middleware,
+      txnClassifierApi.middleware,
     ),
 })
 

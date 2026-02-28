@@ -46,6 +46,8 @@ export interface Transaction {
   // ML classification
   type: 'credit' | 'debit'
   typeConfidence: number
+  isTransactionConfidence?: number
+  userType?: 'credit' | 'debit'
   nerModel: string
   entities: EntityData[]
 
