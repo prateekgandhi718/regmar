@@ -24,6 +24,14 @@ import { parseCASText } from "../helpers/casParser";
 import { ClassifyEmailResponse, ClassifyTransactionTypeResponse, EntityData, ExtractEntitiesResponse, TestResultEntry } from "../helpers/syncTransactions";
 import { processEmailWithPython } from "../helpers/txnProcessing";
 
+const isImapAuthError = (error: any) => {
+  if (!error) return false;
+  if (error.authenticationFailed) return true;
+  if (error.serverResponseCode === "AUTHENTICATIONFAILED") return true;
+  const text = `${error.responseText || ""} ${error.message || ""}`;
+  return /AUTHENTICATIONFAILED|Invalid credentials/i.test(text);
+};
+
 export const syncInvestments = async (
   req: AuthRequest,
   res: express.Response,
@@ -157,6 +165,11 @@ export const syncInvestments = async (
     }
   } catch (error) {
     console.error("Investment sync error:", error);
+    if (isImapAuthError(error)) {
+      return res.status(400).json({
+        message: "Gmail authentication failed. Please update your app password in Settings.",
+      });
+    }
     return res
       .status(500)
       .json({ message: "Internal server error during investment sync" });
@@ -377,6 +390,11 @@ export const syncAccountTransactions = async (
     });
   } catch (error) {
     console.error("Sync error:", error);
+    if (isImapAuthError(error)) {
+      return res.status(400).json({
+        message: "Gmail authentication failed. Please update your app password in Settings.",
+      });
+    }
     return res.status(500).json({
       message: "Internal server error during sync",
     });

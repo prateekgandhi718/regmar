@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, Mail, Lock, ExternalLink, ArrowLeft, Loader2, User, Moon, LogOut } from 'lucide-react'
+import { ChevronRight, Mail, Lock, ExternalLink, ArrowLeft, Loader2, User, Moon, LogOut, MailCheckIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,17 +11,14 @@ import { useSelector, useDispatch } from 'react-redux'
 import { selectCurrentUser, logout } from '@/redux/features/authSlice'
 import { cn } from '@/lib/utils'
 
-const providers = [
-  { id: 'gmail', name: 'Gmail', icon: Mail, color: 'text-rose-500', enabled: true },
-  { id: 'yahoo', name: 'Yahoo', icon: Mail, color: 'text-purple-600', enabled: false },
-  { id: 'icloud', name: 'iCloud', icon: Mail, color: 'text-blue-400', enabled: false },
-  { id: 'custom', name: 'Custom', icon: Mail, color: 'text-orange-500', enabled: false },
-]
+const providers = [{ id: 'gmail', name: 'Gmail', icon: Mail, color: 'text-rose-500', enabled: true }]
 
 const SettingsPage = () => {
   const [step, setStep] = useState<'selection' | 'gmail-form'>('selection')
   const [email, setEmail] = useState('')
   const [appPassword, setAppPassword] = useState('')
+  const [isPasswordPrefilled, setIsPasswordPrefilled] = useState(false)
+  const [initialEmail, setInitialEmail] = useState('')
 
   const user = useSelector(selectCurrentUser)
   const dispatch = useDispatch()
@@ -32,13 +29,30 @@ const SettingsPage = () => {
 
   const activeGmail = linkedAccounts?.find((acc) => acc.provider === 'gmail' && acc.isActive)
 
+  const maskedPassword = '*'.repeat(16)
+  const isEditing = Boolean(activeGmail)
+  const isEmailChanged = email.trim() !== initialEmail.trim()
+  const isPasswordChanged = !isPasswordPrefilled
+  const isPasswordValid = appPassword.length === 16
+  const isSaveDisabled =
+    isLinking ||
+    !email ||
+    (!isEditing && !isPasswordValid) ||
+    (isEditing && !isEmailChanged && !isPasswordChanged) ||
+    (isEditing && isPasswordChanged && !isPasswordValid)
+
   const handleLink = async () => {
-    if (!email || !appPassword) return
+    const shouldSendPassword = !isPasswordPrefilled
+    if (!email) return
+    if (!shouldSendPassword && !isEditing) return
+    if (shouldSendPassword && appPassword.length !== 16) return
     try {
-      await linkGmail({ email, appPassword }).unwrap()
+      await linkGmail({ email, appPassword: shouldSendPassword ? appPassword : '' }).unwrap()
       setStep('selection')
       setEmail('')
       setAppPassword('')
+      setIsPasswordPrefilled(false)
+      setInitialEmail('')
     } catch (error) {
       console.error('Failed to link Gmail:', error)
     }
@@ -57,82 +71,87 @@ const SettingsPage = () => {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-8 pb-24">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => setStep('selection')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl"
+            onClick={() => {
+              setStep('selection')
+              setEmail('')
+              setAppPassword('')
+              setIsPasswordPrefilled(false)
+              setInitialEmail('')
+            }}
+          >
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-black tracking-tight text-primary dark:text-white">Gmail Setup</h1>
         </div>
 
-        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-8 relative overflow-hidden group shadow-sm">
-          <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="bg-rose-50 dark:bg-rose-500/10 p-6 rounded-4xl">
-                <Mail className="h-12 w-12 text-rose-500" />
-              </div>
-            </div>
-            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Google Account Integration</p>
+        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-3xl p-6 space-y-6 shadow-sm">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Add your Gmail address and app password to sync transactions.</p>
           </div>
 
           <div className="space-y-4">
-            <div className="bg-secondary/30 dark:bg-white/5 rounded-3xl border border-border dark:border-white/5 overflow-hidden">
-              <div className="flex items-center px-6 h-16 border-b border-border dark:border-white/5">
-                <Mail className="h-5 w-5 text-muted-foreground mr-4" />
-                <Label className="w-16 text-sm font-bold text-muted-foreground uppercase tracking-wider">Email</Label>
+            <div className="space-y-2">
+              <Label htmlFor="gmail-email">Email</Label>
                 <Input
-                  placeholder="enter email address"
+                  id="gmail-email"
+                  type="email"
+                  placeholder="name@gmail.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="border-none focus-visible:ring-0 text-right bg-transparent flex-1 h-full font-black text-lg"
+                  className="bg-transparent"
                 />
-              </div>
-              <div className="flex items-center px-6 h-16">
-                <Lock className="h-5 w-5 text-muted-foreground mr-4" />
-                <Label className="w-20 text-sm font-bold text-muted-foreground uppercase tracking-wider">Password</Label>
-                <Input
-                  type="password"
-                  placeholder="enter app password"
-                  value={appPassword}
-                  onChange={(e) => setAppPassword(e.target.value)}
-                  className="border-none focus-visible:ring-0 text-right bg-transparent flex-1 h-full font-black text-lg"
-                />
-              </div>
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground text-center uppercase tracking-widest px-4 leading-relaxed">An app-specific password is required for secure synchronization.</p>
-          </div>
-
-          <div className="bg-orange-50 dark:bg-orange-500/5 rounded-3xl p-6 space-y-6 border-2 border-orange-100 dark:border-orange-500/10">
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-3 text-orange-600 dark:text-orange-400 font-black uppercase tracking-wider hover:bg-orange-100 dark:hover:bg-orange-500/10 rounded-2xl h-12 px-4 transition-all"
-              asChild
-            >
-              <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">
-                Generate App Password
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </Button>
-
-            <div className="space-y-4 text-xs font-medium text-orange-800/80 dark:text-orange-300/80 leading-relaxed">
-              <p>
-                <span className="font-black text-orange-600 dark:text-orange-400">01.</span> Sign-in to your Google Account through the button above.
-              </p>
-              <p>
-                <span className="font-black text-orange-600 dark:text-orange-400">02.</span> In <span className="italic">App passwords</span>, name it{' '}
-                <span className="font-black text-orange-600 dark:text-orange-400">Regmar</span> and tap Create.
-              </p>
-              <p>
-                <span className="font-black text-orange-600 dark:text-orange-400">03.</span> Copy the 16-character code and paste it in the field above.
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="gmail-password">App password</Label>
+              <Input
+                id="gmail-password"
+                type="password"
+                placeholder="16-character app password"
+                value={appPassword}
+                onChange={(e) => {
+                  const normalized = e.target.value.replace(/\s+/g, '')
+                  setAppPassword(normalized.slice(0, 16))
+                }}
+                onFocus={() => {
+                  if (isPasswordPrefilled) {
+                    setAppPassword('')
+                    setIsPasswordPrefilled(false)
+                  }
+                }}
+                className="bg-transparent"
+              />
+              <p className="text-xs text-muted-foreground">Use a 16-character app-specific password from your Google account.</p>
             </div>
           </div>
 
-          <div className="pt-4 flex gap-4">
+          <div className="rounded-2xl border border-border/60 dark:border-white/5 p-4 space-y-3 bg-secondary/20 dark:bg-white/5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Create App Password</p>
+              <Button variant="outline" className="h-7 p-2 rounded-xl" asChild>
+                <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">
+                  Open Google
+                  <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            </div>
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <p>1. Sign in to your Google account.</p>
+              <p>2. Create an app password named Regmar.</p>
+              <p>3. Paste the 16-character code here.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
             <Button
-              className="flex-1 h-16 rounded-3xl font-black uppercase tracking-widest bg-linear-to-r from-orange-500 to-rose-500 text-white shadow-xl shadow-orange-500/20 active:scale-95 transition-all disabled:opacity-50"
+              className="h-11 rounded-2xl font-bold"
               onClick={handleLink}
-              disabled={isLinking || !email || !appPassword}
+              disabled={isSaveDisabled}
             >
-              {isLinking ? <Loader2 className="h-6 w-6 animate-spin" /> : 'Link Gmail'}
+              {isLinking ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Save'}
             </Button>
           </div>
         </div>
@@ -141,38 +160,84 @@ const SettingsPage = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-12 pb-24">
-      <div className="space-y-2 px-1">
-        <p className="text-muted-foreground font-medium">Manage your preferences</p>
-        <h1 className="text-3xl font-black tracking-tight text-primary dark:text-white">Settings</h1>
+    <div className="max-w-2xl mx-auto p-6 space-y-8 pb-20">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-black tracking-tight">Settings</h1>
       </div>
 
-      {/* Account Widget */}
+      {/* Email Integration Widget */}
       <div className="space-y-6">
         <h2 className="text-xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
-          <User className="h-5 w-5" />
-          Account
+          <Mail className="h-5 w-5" />
+          Email Sync
         </h2>
-        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-6 shadow-sm relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform text-primary dark:text-white">
-            <User className="h-32 w-32" />
-          </div>
+        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-3xl p-6 space-y-6 shadow-sm">
+          {activeGmail ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-2xl border border-border dark:border-white/5 p-4 bg-secondary/20 dark:bg-white/5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="bg-background/70 dark:bg-white/5 p-2 rounded-xl border border-border/60 dark:border-white/10">
+                    <MailCheckIcon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-primary dark:text-white truncate">{activeGmail.email}</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-muted-foreground">Connected</span>
+              </div>
 
-          <div className="flex items-center gap-6 relative z-10 min-w-0">
-            <div className="space-y-1 min-w-0">
-              <p className="text-2xl font-black tracking-tight text-primary dark:text-white truncate">{user?.name || 'Member'}</p>
-              <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest truncate">{user?.email}</p>
+              <div className="flex items-center justify-around gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEmail(activeGmail.email)
+                    setInitialEmail(activeGmail.email)
+                    setAppPassword(maskedPassword)
+                    setIsPasswordPrefilled(true)
+                    setStep('gmail-form')
+                  }}
+                  className="h-11 rounded-2xl font-semibold"
+                >
+                  Edit Credentials
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleUnlink(activeGmail.id)}
+                  disabled={isUnlinking}
+                  className="h-11 rounded-2xl font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                >
+                  {isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Unlink Gmail'}
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Connect your email account to automatically track your statements.</p>
 
-          <Button
-            variant="ghost"
-            onClick={() => dispatch(logout())}
-            className="w-full h-14 rounded-2xl bg-rose-50 dark:bg-rose-500/5 text-rose-600 dark:text-rose-400 font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-500/10 transition-all border border-rose-100/50 dark:border-rose-500/10"
-          >
-            <LogOut className="h-5 w-5 mr-2" />
-            Sign Out
-          </Button>
+              <div className="grid grid-cols-1 gap-2">
+                {providers.map((provider) => (
+                  <Button
+                    key={provider.id}
+                    variant="outline"
+                    className="h-12 justify-between px-4 rounded-2xl border-border dark:border-white/5 bg-transparent hover:bg-secondary/30 dark:hover:bg-white/5 transition-all"
+                    onClick={() => {
+                      setEmail('')
+                      setInitialEmail('')
+                      setAppPassword('')
+                      setIsPasswordPrefilled(false)
+                      setStep('gmail-form')
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <provider.icon className={cn('h-5 w-5', provider.color)} />
+                      <span className="font-semibold text-primary dark:text-white">{provider.name}</span>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -191,72 +256,32 @@ const SettingsPage = () => {
         </div>
       </div>
 
-      {/* Email Integration Widget */}
+      {/* Account Widget */}
       <div className="space-y-6">
-        <h2 className="text-xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
-          <Mail className="h-5 w-5" />
-          Email Sync
+        <h2 className="text-3xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
+          <User className="h-5 w-5" />
+          Account
         </h2>
-        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-8 shadow-sm">
-          {activeGmail ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between p-6 bg-emerald-50 dark:bg-emerald-500/5 rounded-3xl border border-emerald-100 dark:border-emerald-500/10 overflow-hidden">
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="bg-white dark:bg-white/10 p-3 rounded-2xl shadow-sm border border-emerald-100/20 shrink-0">
-                    <Mail className="h-6 w-6 text-emerald-500" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest text-[10px] mb-1 truncate">Active Sync</p>
-                    <p className="text-lg font-black tracking-tight text-primary dark:text-white truncate">{activeGmail.email}</p>
-                  </div>
-                </div>
-              </div>
+        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-6 shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform text-primary dark:text-white">
+            <User className="h-32 w-32" />
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Button variant="outline" onClick={() => setStep('gmail-form')} className="h-14 rounded-2xl font-bold bg-secondary dark:bg-white/5 border-none text-primary dark:text-white">
-                  Edit Credentials
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleUnlink(activeGmail.id)}
-                  disabled={isUnlinking}
-                  className="h-14 rounded-2xl font-bold bg-rose-50 dark:bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/10 border border-rose-100/20 dark:border-rose-500/10"
-                >
-                  {isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Unlink Gmail'}
-                </Button>
-              </div>
+          <div className="flex items-center gap-6 relative z-10 min-w-0">
+            <div className="space-y-1 min-w-0">
+              <p className="font-bold text-lg text-primary dark:text-white truncate">{user?.name || 'Member'}</p>
+              <p className="text-sm font-medium text-muted-foreground truncate">{user?.email}</p>
             </div>
-          ) : (
-            <div className="space-y-6">
-              <p className="text-muted-foreground font-medium px-1 text-lg">Connect your email account to automatically track your statements and financial activity.</p>
+          </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                {providers.map((provider) => (
-                  <Button
-                    key={provider.id}
-                    variant="outline"
-                    className={cn(
-                      'h-20 justify-between px-6 rounded-3xl border-border dark:border-white/5 bg-secondary/30 dark:bg-white/5 hover:bg-secondary/50 dark:hover:bg-white/10 transition-all disabled:opacity-30 disabled:grayscale',
-                      provider.enabled && 'hover:scale-[1.02] active:scale-[0.98]',
-                    )}
-                    disabled={!provider.enabled}
-                    onClick={() => provider.id === 'gmail' && setStep('gmail-form')}
-                  >
-                    <div className="flex items-center gap-5">
-                      <div className="bg-white dark:bg-white/10 p-3 rounded-2xl shadow-sm border border-border dark:border-white/5">
-                        <provider.icon className={cn('h-6 w-6', provider.color)} />
-                      </div>
-                      <div className="text-left">
-                        <span className="font-black text-xl tracking-tight block text-primary dark:text-white">{provider.name}</span>
-                        {!provider.enabled && <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Coming Soon</span>}
-                      </div>
-                    </div>
-                    {provider.enabled && <ChevronRight className="h-6 w-6 text-muted-foreground" />}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
+          <Button
+            variant="ghost"
+            onClick={() => dispatch(logout())}
+            className="w-full h-14 rounded-2xl bg-rose-50 dark:bg-rose-500/5 text-rose-600 dark:text-rose-400 font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-500/10 transition-all border border-rose-100/50 dark:border-rose-500/10"
+          >
+            <LogOut className="h-5 w-5 mr-2" />
+            Sign Out
+          </Button>
         </div>
       </div>
     </div>

@@ -13,33 +13,40 @@ export const upsertGmailLink = async (req: AuthRequest, res: Response) => {
   const { email, appPassword } = req.body;
   const userId = req.userId;
 
-  if (!email || !appPassword) {
-    return res.status(400).json({ message: 'Email and app password are required' });
-  }
-
   if (!userId) {
     return res.status(401).json({ message: 'User not authenticated' });
   }
 
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
   try {
-    const encryptedPassword = encrypt(appPassword);
-    
     // Check if an active link already exists
     let existingLink = await getActiveLinkedAccountByUserId(userId);
 
     if (existingLink) {
-      // Update existing
-      existingLink = await updateLinkedAccountById(existingLink._id.toString(), {
-        email,
-        appPassword: encryptedPassword,
-        provider: 'gmail'
-      });
+      // Update existing (app password optional)
+      const updatePayload: Record<string, any> = { email, provider: 'gmail' };
+      if (appPassword) {
+        if (String(appPassword).length !== 16) {
+          return res.status(400).json({ message: 'App password must be 16 characters' });
+        }
+        updatePayload.appPassword = encrypt(appPassword);
+      }
+      existingLink = await updateLinkedAccountById(existingLink._id.toString(), updatePayload);
     } else {
+      if (!appPassword) {
+        return res.status(400).json({ message: 'App password is required' });
+      }
+      if (String(appPassword).length !== 16) {
+        return res.status(400).json({ message: 'App password must be 16 characters' });
+      }
       // Create new
       existingLink = await createLinkedAccount({
         userId,
         email,
-        appPassword: encryptedPassword,
+        appPassword: encrypt(appPassword),
         provider: 'gmail',
         isActive: true
       });
@@ -100,4 +107,3 @@ export const removeLinkedAccount = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
-
