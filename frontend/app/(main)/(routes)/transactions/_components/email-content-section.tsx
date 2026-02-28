@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Banknote, Store, X, AlertCircle } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Banknote, Store, X, AlertCircle, ShieldCheck, ShieldX, CreditCard } from 'lucide-react'
 
 import { EntityData } from '@/redux/api/transactionsApi'
 import { useSaveNerFeedbackMutation } from '@/redux/api/nerFeedbackApi'
+import { useSaveTxnClassifierFeedbackMutation } from '@/redux/api/txnClassifierApi'
 import { toast } from 'sonner'
 
 interface Props {
@@ -17,6 +19,12 @@ interface Props {
   correctedEntities: EntityData[] | null
   transactionId: string
   nerModelVersion?: string
+  type?: 'credit' | 'debit'
+  typeConfidence?: number
+  isTransactionConfidence?: number
+  sourceDomain?: string
+  userType?: 'credit' | 'debit'
+  onTransactionDeleted?: () => void
 }
 
 type EditableEntity = {
@@ -27,8 +35,21 @@ type EditableEntity = {
   source: 'model' | 'user'
 }
 
-export const EmailContentSection = ({ emailBody = '', entities = [], correctedEntities, transactionId, nerModelVersion }: Props) => {
+export const EmailContentSection = ({
+  emailBody = '',
+  entities = [],
+  correctedEntities,
+  transactionId,
+  nerModelVersion,
+  type,
+  typeConfidence,
+  isTransactionConfidence,
+  sourceDomain,
+  userType,
+  onTransactionDeleted,
+}: Props) => {
   const [saveFeedback, { isLoading }] = useSaveNerFeedbackMutation()
+  const [saveTxnFeedback, { isLoading: isSavingTxnFeedback }] = useSaveTxnClassifierFeedbackMutation()
 
   // 1. Initialize states
   const modelEntities: EditableEntity[] = useMemo(
@@ -59,11 +80,30 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
     start: number
     end: number
   } | null>(null)
+  const [txnPopoverOpen, setTxnPopoverOpen] = useState(false)
+  const [typePopoverOpen, setTypePopoverOpen] = useState(false)
+  const [confirmedTxn, setConfirmedTxn] = useState(false)
+  const [confirmedType, setConfirmedType] = useState(false)
+  const [localTxnType, setLocalTxnType] = useState<'credit' | 'debit' | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    if (userType) {
+      setLocalTxnType(userType)
+      setConfirmedTxn(true)
+      setConfirmedType(true)
+    }
+  }, [userType])
+
+  const annotationsEnabled = confirmedTxn && confirmedType && Boolean(localTxnType)
+
   // 2. Mobile-Friendly Text Selection Logic
   useEffect(() => {
+    if (!annotationsEnabled) {
+      setSelectionData(null)
+      return
+    }
     const handleSelectionChange = () => {
       if (!containerRef.current) return
 
@@ -96,7 +136,7 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
 
     document.addEventListener('selectionchange', handleSelectionChange)
     return () => document.removeEventListener('selectionchange', handleSelectionChange)
-  }, [])
+  }, [annotationsEnabled])
 
   // 3. Update User Tags (Enforcing Max 1 per label)
   const handleTagSelection = (label: 'AMOUNT' | 'MERCHANT') => {
@@ -123,6 +163,65 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
 
   const removeUserEntity = (label: 'AMOUNT' | 'MERCHANT') => {
     setUserEntities((prev) => prev.filter((e) => e.label !== label))
+  }
+
+  const formatConfidence = (value?: number) => {
+    if (typeof value !== 'number') return 'n/a'
+    return `${Math.round(value * 100)}% sure`
+  }
+
+  const confidenceTone = (value?: number) => {
+    if (typeof value !== 'number') return 'border-muted-foreground/40 bg-muted/20 text-muted-foreground'
+    if (value < 0.6) return 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700/60 dark:bg-rose-950/40 dark:text-rose-200'
+    if (value < 0.8) return 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200'
+    return 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+  }
+
+  const handleTxnConfirmed = () => {
+    setConfirmedTxn(true)
+    setTxnPopoverOpen(false)
+    setTypePopoverOpen(true)
+  }
+
+  const handleTxnRejected = async () => {
+    try {
+      await saveTxnFeedback({
+        transactionId,
+        emailText: emailBody,
+        sourceDomain,
+        isTransaction: false,
+        modelConfidence: isTransactionConfidence,
+        typeConfidence,
+      }).unwrap()
+      toast.success('Thanks for the feedback!', { position: 'bottom-center' })
+      onTransactionDeleted?.()
+    } catch {
+      toast.error('Failed to save feedback.', { position: 'bottom-center' })
+    } finally {
+      setTxnPopoverOpen(false)
+    }
+  }
+
+  const handleTypeSelection = async (selectedType: 'credit' | 'debit') => {
+    try {
+      await saveTxnFeedback({
+        transactionId,
+        emailText: emailBody,
+        sourceDomain,
+        isTransaction: true,
+        txnType: selectedType,
+        modelConfidence: isTransactionConfidence,
+        typeConfidence,
+      }).unwrap()
+      setLocalTxnType(selectedType)
+      setConfirmedTxn(true)
+      setConfirmedType(true)
+      toast.success('Thanks for the feedback!', { position: 'bottom-center' })
+    } catch {
+      toast.error('Failed to save feedback.', { position: 'bottom-center' })
+    } finally {
+      setTypePopoverOpen(false)
+    }
   }
 
   // 4. Safe Overlap Rendering Engine (Character State Grouping)
@@ -195,8 +294,100 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
   return (
     <Card className="w-full relative shadow-sm max-w-2xl mx-auto overflow-hidden">
       <CardContent className="pt-4 space-y-4">
-        {/* ACTIVE TAGS LEGEND */}
-        <div className="flex flex-col gap-2">
+        {/* CLASSIFICATION BADGES */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Classification</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Popover open={txnPopoverOpen} onOpenChange={setTxnPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={`gap-2 cursor-pointer ${confidenceTone(isTransactionConfidence)}`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Transaction
+                  <span className="text-[10px] opacity-70">({formatConfidence(isTransactionConfidence)})</span>
+                </Badge>
+              </PopoverTrigger>
+              <PopoverContent className="w-72">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">Is this a transaction?</p>
+                    <p className="text-xs text-muted-foreground">Your answer improves the model.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button size="sm" className="gap-2" onClick={handleTxnConfirmed} disabled={isSavingTxnFeedback}>
+                      <ShieldCheck className="w-4 h-4" /> Yes
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-2" onClick={handleTxnRejected} disabled={isSavingTxnFeedback}>
+                      <ShieldX className="w-4 h-4" /> Not a txn
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className={`gap-2 cursor-pointer ${confidenceTone(typeConfidence)}`}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  {type ? type.toUpperCase() : 'Type'}
+                  <span className="text-[10px] opacity-70">({formatConfidence(typeConfidence)})</span>
+                </Badge>
+              </PopoverTrigger>
+              <PopoverContent className="w-72">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold">Debit or credit?</p>
+                    <p className="text-xs text-muted-foreground">Select the correct type.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleTypeSelection('debit')} disabled={isSavingTxnFeedback}>
+                      Debit
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleTypeSelection('credit')} disabled={isSavingTxnFeedback}>
+                      Credit
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {localTxnType && (
+              <Badge
+                variant="outline"
+                className="inline-flex w-auto self-start gap-2 border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700/60 dark:bg-slate-950/40 dark:text-slate-200"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                {localTxnType.toUpperCase()} <span className="text-[10px] opacity-70">(you)</span>
+              </Badge>
+            )}
+          </div>
+
+          {!annotationsEnabled && (
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+              <AlertCircle className="w-4 h-4 mt-0.5" />
+              <p>Confirm transaction and type to enable annotation edits.</p>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* EMAIL DETAILS */}
+        {annotationsEnabled && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Email Details</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Highlight the amount and merchant name in the email so we can improve accuracy.
+          </p>
           <div className="flex flex-wrap gap-2">
             {/* Amount Badge */}
             {uAmt ? (
@@ -269,14 +460,13 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
             )}
           </div>
         </div>
-
-        <Separator />
+        )}
 
         {/* EMAIL BODY TEXT HIGHLIGHTER */}
         <div
           className={`
             relative bg-background rounded-lg border p-4 text-sm
-            leading-relaxed whitespace-pre-wrap select-text
+            leading-relaxed whitespace-pre-wrap ${annotationsEnabled ? 'select-text' : 'select-none'}
             transition-all duration-500 ease-in-out overflow-hidden
             ${expanded ? 'max-h-[1000px]' : 'max-h-[100px]'}
           `}
@@ -316,13 +506,19 @@ export const EmailContentSection = ({ emailBody = '', entities = [], correctedEn
           <div />
         )}
 
-        <Button size="sm" onClick={save} disabled={!canSave || isLoading} className="gap-2 shadow-sm">
-          Save
-        </Button>
+        {annotationsEnabled ? (
+          <Button size="sm" onClick={save} disabled={!canSave || isLoading} className="gap-2 shadow-sm">
+            Save
+          </Button>
+        ) : (
+          <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-muted-foreground border-dashed">
+            Annotation locked
+          </Badge>
+        )}
       </CardFooter>
 
       {/* MOBILE FLOATING ACTION BAR FOR SELECTION */}
-      {selectionData && (
+      {selectionData && annotationsEnabled && (
         <div className="fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-4 fade-in duration-200">
           <div className="bg-popover border shadow-xl rounded-xl p-3 flex flex-col gap-3 mx-auto max-w-sm">
             <div className="flex items-center gap-2 px-1">

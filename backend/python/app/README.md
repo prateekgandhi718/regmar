@@ -79,8 +79,8 @@ uv run app/ml/train_classifier.py ../ml_data/classifier_data.csv
 ```
 
 **Outputs**:
-- `app/models/email_classifier.joblib`
-- `app/models/classifier_metadata.json` (metrics)
+- `app/ml/models/email_classifier.joblib`
+- `app/ml/models/classifier_metadata.json` (metrics)
 
 ---
 
@@ -126,8 +126,8 @@ uv run app/ml/train_type_classifier.py ../ml_data/type_classifier_data.csv
 ```
 
 **Outputs**:
-- `app/models/type_classifier.joblib`
-- `app/models/type_classifier_metadata.json` (metrics)
+- `app/ml/models/type_classifier.joblib`
+- `app/ml/models/type_classifier_metadata.json` (metrics)
 
 ---
 
@@ -224,9 +224,9 @@ uv run spacy train config.cfg \
 ```
 
 **Outputs**:
-- `app/models/model-best/` (best model based on dev performance)
-- `app/models/model-last/` (final epoch model)
-- `app/models/training/` (training metrics)
+- `app/ml/models/ner_v*/model-best/` (best model based on dev performance)
+- `app/ml/models/ner_v*/model-last/` (final epoch model)
+- `app/ml/models/ner_v*/training/` (training metrics)
 
 ---
 
@@ -299,7 +299,7 @@ result = classify_transaction_type("Your account debited Rs 500...")
 Final trained models location:
 
 ```
-backend/python/app/models/
+backend/python/app/ml/models/
 ├── model-best/                      (best NER model)
 ├── model-last/                      (final NER model)
 ├── training/                        (NER training logs)

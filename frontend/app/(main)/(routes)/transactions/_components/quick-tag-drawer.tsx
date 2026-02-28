@@ -89,7 +89,18 @@ export const QuickTagDrawer = ({ transaction, isOpen, onClose }: QuickTagDrawerP
             {/* Email content section  */}
             <div className="space-y-6">
             <h3 className="text-base font-black uppercase tracking-widest text-foreground">Email Content</h3>
-            <EmailContentSection emailBody={transaction.emailBody} entities={transaction.entities} transactionId={transaction._id} correctedEntities={transaction.correctedEntities}/>
+            <EmailContentSection
+              emailBody={transaction.emailBody}
+              entities={transaction.entities}
+              transactionId={transaction._id}
+              correctedEntities={transaction.correctedEntities}
+              type={transaction.type}
+              typeConfidence={transaction.typeConfidence}
+              isTransactionConfidence={transaction.isTransactionConfidence}
+              userType={transaction.userType}
+              sourceDomain={transaction.domainId?.fromEmail}
+              onTransactionDeleted={onClose}
+            />
             </div>
           </div>
         </div>

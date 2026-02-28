@@ -36,6 +36,14 @@ def load_classifier_model():
         return None
 
 
+def reload_classifier_model():
+    """Force reload the trained classifier model."""
+    global _classifier_model, _model_loaded
+    _classifier_model = None
+    _model_loaded = False
+    return load_classifier_model()
+
+
 def classify_email_func(email_body: str) -> dict:
     """
     Classify an email as transaction (1) or non-transaction (0).

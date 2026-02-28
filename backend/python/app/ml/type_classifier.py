@@ -37,6 +37,14 @@ def load_type_classifier_model():
         return None
 
 
+def reload_type_classifier_model():
+    """Force reload the trained type classifier model."""
+    global _type_classifier_model, _model_loaded
+    _type_classifier_model = None
+    _model_loaded = False
+    return load_type_classifier_model()
+
+
 def classify_transaction_type(email_body: str) -> dict:
     """
     Classify a transaction email as debit (1) or credit (0).

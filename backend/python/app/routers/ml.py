@@ -6,9 +6,18 @@ from fastapi import APIRouter
 from app.schemas import (
     ClassifyEmailRequest, ClassifyEmailResponse,
     ClassifyTransactionTypeRequest, ClassifyTransactionTypeResponse,
-    ExtractEntitiesRequest, ExtractEntitiesResponse, RetrainNerRequest, RetrainNerResponse
+    ExtractEntitiesRequest, ExtractEntitiesResponse, RetrainNerRequest, RetrainNerResponse,
+    RetrainClassifierRequest, RetrainClassifierResponse,
+    RetrainTypeClassifierRequest, RetrainTypeClassifierResponse,
 )
-from app.controllers.ml import classify_email, classify_txn_type, extract_ner_entities, retrain_ner_model
+from app.controllers.ml import (
+    classify_email,
+    classify_txn_type,
+    extract_ner_entities,
+    retrain_ner_model,
+    retrain_classifier_model,
+    retrain_type_classifier_model,
+)
 
 router = APIRouter(prefix="/ml", tags=["ml"])
 
@@ -102,3 +111,25 @@ async def retrain_endpoint(request: RetrainNerRequest) -> RetrainNerResponse:
     """
     result = retrain_ner_model(request.samples)
     return RetrainNerResponse(**result)
+
+
+@router.post("/retrain-classifier", response_model=RetrainClassifierResponse)
+async def retrain_classifier_endpoint(
+    request: RetrainClassifierRequest,
+) -> RetrainClassifierResponse:
+    """
+    Append new classifier samples and retrain email classifier.
+    """
+    result = retrain_classifier_model(request.samples)
+    return RetrainClassifierResponse(**result)
+
+
+@router.post("/retrain-txn-type", response_model=RetrainTypeClassifierResponse)
+async def retrain_type_classifier_endpoint(
+    request: RetrainTypeClassifierRequest,
+) -> RetrainTypeClassifierResponse:
+    """
+    Append new type classifier samples and retrain transaction type classifier.
+    """
+    result = retrain_type_classifier_model(request.samples)
+    return RetrainTypeClassifierResponse(**result)

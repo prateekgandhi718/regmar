@@ -106,7 +106,18 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
           {/* Email content section  */}
           <div className="space-y-2">
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Email Content</p>
-          <EmailContentSection emailBody={transaction.emailBody} entities={transaction.entities} transactionId={transaction._id} correctedEntities={transaction.correctedEntities} />
+          <EmailContentSection
+            emailBody={transaction.emailBody}
+            entities={transaction.entities}
+            transactionId={transaction._id}
+            correctedEntities={transaction.correctedEntities}
+            type={transaction.type}
+            typeConfidence={transaction.typeConfidence}
+            isTransactionConfidence={transaction.isTransactionConfidence}
+            userType={transaction.userType}
+            sourceDomain={transaction.domainId?.fromEmail}
+            onTransactionDeleted={onClose}
+          />
             </div>
         </div>
 
