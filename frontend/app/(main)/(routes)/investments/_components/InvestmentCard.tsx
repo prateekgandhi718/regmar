@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import type { ReactNode } from 'react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -10,33 +11,42 @@ export interface InvestmentCardRow {
 }
 
 interface InvestmentCardProps {
-  title: string
+  title: ReactNode
   rows: InvestmentCardRow[]
   logoUrl?: string
   logoAlt?: string
+  headerRight?: ReactNode
 }
 
-export const InvestmentCard = ({ title, rows, logoUrl, logoAlt }: InvestmentCardProps) => {
+export const InvestmentCard = ({ title, rows, logoUrl, logoAlt, headerRight }: InvestmentCardProps) => {
   return (
     <Card className="rounded-3xl bg-card dark:bg-[#111111] border border-border dark:border-white/5 p-5 space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        {logoUrl && (
-          <div className="h-6 w-6 rounded-4xl bg-muted/40 flex items-center justify-center overflow-hidden">
-            <Image
-              src={logoUrl}
-              alt={logoAlt || title}
-              width={24}
-              height={24}
-              className="object-contain"
-              onError={(e) => {
-                e.currentTarget.src = '/icons/default-asset.svg'
-              }}
-            />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {logoUrl && (
+            <div className="h-6 w-6 rounded-4xl bg-muted/40 flex items-center justify-center overflow-hidden">
+              <Image
+                src={logoUrl}
+                alt={logoAlt || 'Investment logo'}
+                width={24}
+                height={24}
+                className="object-contain"
+                onError={(e) => {
+                  e.currentTarget.src = '/icons/default-asset.svg'
+                }}
+              />
+            </div>
+          )}
+
+          <h3 className="text-sm font-black tracking-tight text-primary leading-tight">{title}</h3>
+        </div>
+
+        {headerRight && (
+          <div className="shrink-0">
+            {headerRight}
           </div>
         )}
-
-        <h3 className="text-sm font-black tracking-tight text-primary leading-tight">{title}</h3>
       </div>
 
       {/* Rows */}

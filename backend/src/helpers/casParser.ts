@@ -27,6 +27,8 @@ export interface ParsedCAS {
     currentValue: number;
     unrealizedPnL: number;
     unrealizedPnLPercentage: number;
+    sipActive: boolean;
+    sipMonthlyAmount: number;
   }>;
   stocks: Array<{
     name: string;
@@ -84,6 +86,69 @@ const cleanMFName = (name: string): string => {
     .trim();
 };
 
+const extractTrailingNumber = (val: string | undefined): number => {
+  if (!val) return 0;
+  const trailingNumber = val.match(/(-?\d[\d,]*(?:\.\d+)?)\s*$/);
+  if (trailingNumber) return parseAmount(trailingNumber[1]);
+  return parseAmount(val);
+};
+
+const extractFirstDecimalAfterDate = (line: string): number => {
+  const dateMatch = line.match(/\b\d{2}-\d{2}-\d{4}\b/);
+  if (!dateMatch) return 0;
+  const dateStart = dateMatch.index || 0;
+  const afterDate = line.slice(dateStart + dateMatch[0].length);
+  const decimalAmountMatch = afterDate.match(/-?\d[\d,]*\.\d+/);
+  return parseAmount(decimalAmountMatch?.[0]);
+};
+
+const extractMfSipAmountsByIsin = (lines: string[]): Record<string, number> => {
+  const sipAmountByIsin: Record<string, number> = {};
+  const sipKeywordRegex = /\b(sip|systematic)\b/i;
+  const startRegex = /statement of transactions for the period/i;
+  const endRegex = /mutual fund units held as on/i;
+
+  let inMfTransactionSection = false;
+  let currentIsin = '';
+  let sipMarkerWindow = 0;
+
+  for (const line of lines) {
+    if (startRegex.test(line)) {
+      inMfTransactionSection = true;
+      currentIsin = '';
+      sipMarkerWindow = 0;
+      continue;
+    }
+
+    if (inMfTransactionSection && endRegex.test(line)) {
+      inMfTransactionSection = false;
+      currentIsin = '';
+      sipMarkerWindow = 0;
+      continue;
+    }
+
+    if (!inMfTransactionSection) continue;
+
+    const isinMatch = line.match(/ISIN\s*:\s*(INF[A-Z0-9]{9})/i);
+    if (isinMatch) {
+      currentIsin = isinMatch[1];
+    }
+
+    if (sipKeywordRegex.test(line)) {
+      sipMarkerWindow = 5;
+    }
+
+    const amount = extractFirstDecimalAfterDate(line);
+    if (currentIsin && amount > 0 && sipMarkerWindow > 0) {
+      sipAmountByIsin[currentIsin] = (sipAmountByIsin[currentIsin] || 0) + amount;
+    }
+
+    if (sipMarkerWindow > 0) sipMarkerWindow -= 1;
+  }
+
+  return sipAmountByIsin;
+};
+
 export const parseCASText = (fullText: string): ParsedCAS | null => {
   try {
     const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -101,6 +166,8 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
       mutualFunds: [],
       stocks: [],
     };
+
+    const mfSipAmountByIsin = extractMfSipAmountsByIsin(lines);
 
     // ---- MF META LOOKUP (from MF DETAILS section) ----
     const mfMetaByIsin: Record<string, MFMeta> = {};
@@ -232,6 +299,26 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
           const idxInParts = parts.findIndex(p => p.includes(isin));
           
           if (idxInParts !== -1 && parts.length >= idxInParts + 4) {
+             const securityOrCurrentPart = parts[idxInParts + 1] || '';
+             const hasSecurityText = /[A-Za-z]/.test(securityOrCurrentPart);
+
+             let currentBalance = 0;
+             let frozenIndex = idxInParts + 2;
+
+             if (hasSecurityText) {
+               const trailingCurrent = extractTrailingNumber(securityOrCurrentPart);
+               if (trailingCurrent !== 0 || /\d/.test(securityOrCurrentPart)) {
+                 currentBalance = trailingCurrent;
+                 frozenIndex = idxInParts + 2;
+               } else {
+                 currentBalance = parseAmount(parts[idxInParts + 2]);
+                 frozenIndex = idxInParts + 3;
+               }
+             } else {
+               currentBalance = parseAmount(securityOrCurrentPart);
+               frozenIndex = idxInParts + 2;
+             }
+
              let nameParts = [];
              for (let j = Math.max(lastIsinIdx + 1, i - 2); j < i; j++) {
                if (!lines[j].includes('---') && !lines[j].includes('Page')) nameParts.push(lines[j]);
@@ -242,13 +329,13 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
              result.stocks.push({
                isin,
                name: stockMeta?.name || cleanStockName(nameParts.join(' ')),
-               ticker: stockMeta.symbol,
-               currentBalance: parseAmount(parts[idxInParts + 1]),
-               frozenBalance: parseAmount(parts[idxInParts + 2]),
-               pledgeBalance: parseAmount(parts[idxInParts + 3]),
-               freeBalance: parseAmount(parts[idxInParts + 5]),
-               marketPrice: parseAmount(parts[idxInParts + 6]),
-               currentValue: parseAmount(parts[idxInParts + 7])
+               ticker: stockMeta?.symbol || '',
+               currentBalance,
+               frozenBalance: parseAmount(parts[frozenIndex]),
+               pledgeBalance: parseAmount(parts[frozenIndex + 1]),
+               freeBalance: parseAmount(parts[frozenIndex + 3]),
+               marketPrice: parseAmount(parts[frozenIndex + 4]),
+               currentValue: parseAmount(parts[frozenIndex + 5])
              });
              lastIsinIdx = i;
           }
@@ -289,6 +376,8 @@ export const parseCASText = (fullText: string): ParsedCAS | null => {
               currentValue: parseAmount(parts[idxInParts + 5]),
               unrealizedPnL: parseAmount(parts[idxInParts + 6]),
               unrealizedPnLPercentage: parseAmount(parts[idxInParts + 7]),
+              sipActive: (mfSipAmountByIsin[isin] || 0) > 0,
+              sipMonthlyAmount: Number((mfSipAmountByIsin[isin] || 0).toFixed(2)),
               type: isDirect ? 'Direct' : 'Regular',
             });
             

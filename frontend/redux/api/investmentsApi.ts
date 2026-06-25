@@ -29,6 +29,13 @@ export interface MutualFund {
   currentValue: number
   unrealizedPnL: number
   unrealizedPnLPercentage: number
+  sipActive: boolean
+  sipMonthlyAmount: number
+}
+
+export interface SipSummary {
+  activeFunds: number
+  totalMonthlyAmount: number
 }
 
 export interface Stock {
@@ -54,6 +61,7 @@ export interface InvestmentData {
   casId: string
   statementPeriod: string
   summary: InvestmentSummary
+  sipSummary: SipSummary
   historicalValuation: HistoricalValuation[]
   mutualFunds: MutualFund[]
   stocks: Stock[]
