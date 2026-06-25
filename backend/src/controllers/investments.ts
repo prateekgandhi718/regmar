@@ -41,6 +41,20 @@ export const getMyInvestments = async (
       };
     });
 
+    const mutualFunds = (investment.mutualFunds || []).map(fund => {
+      const sipMonthlyAmount = safeNumber((fund as any).sipMonthlyAmount);
+      return {
+        ...(fund as any).toObject?.() ?? fund,
+        sipActive: Boolean((fund as any).sipActive) && sipMonthlyAmount > 0,
+        sipMonthlyAmount: Number(sipMonthlyAmount.toFixed(2)),
+      };
+    });
+
+    const activeSipFunds = mutualFunds.filter(fund => fund.sipActive).length;
+    const totalMonthlySipAmount = Number(
+      mutualFunds.reduce((sum, fund) => sum + safeNumber(fund.sipMonthlyAmount), 0).toFixed(2)
+    );
+
     // 2. Return the full document structure
     return res.status(200).json({
       pan: investment.pan,
@@ -53,8 +67,12 @@ export const getMyInvestments = async (
         mfFolioValue: safeNumber(investment.summary?.mfFolioValue),
         mfDematValue: safeNumber(investment.summary?.mfDematValue),
       },
+      sipSummary: {
+        activeFunds: activeSipFunds,
+        totalMonthlyAmount: totalMonthlySipAmount,
+      },
       stocks,
-      mutualFunds: investment.mutualFunds || [],
+      mutualFunds,
       historicalValuation: investment.historicalValuation || [],
     });
 

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SummaryCard } from '@/components/investments/SummaryCard'
 import { HistoricalChart } from '@/components/investments/HistoricalChart'
+import { AllocationPieChart } from '@/components/investments/AllocationPieChart'
 import { Loader2, ShieldCheck, RefreshCw, Layers, TrendingUp, Eye, EyeOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { StatementPeriod } from './_components/StatementPeriod'
@@ -165,6 +166,13 @@ const InvestmentsPage = () => {
               />
 
               {investments.historicalValuation?.length > 0 && <HistoricalChart data={investments.historicalValuation} />}
+
+              <AllocationPieChart
+                mutualFundsValue={summary.mfFolioValue}
+                etfValue={summary.mfDematValue}
+                stocksValue={summary.equityValue}
+                hideValues={hideValues}
+              />
             </>
           ) : (
             <div className="text-center py-20 border-2 border-dashed border-border rounded-4xl">

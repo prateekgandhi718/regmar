@@ -31,6 +31,8 @@ const InvestmentSchema = new mongoose.Schema({
     currentValue: { type: Number },
     unrealizedPnL: { type: Number },
     unrealizedPnLPercentage: { type: Number },
+    sipActive: { type: Boolean, default: false },
+    sipMonthlyAmount: { type: Number, default: 0 },
   }],
   stocks: [{
     name: { type: String },
@@ -51,4 +53,3 @@ export const getInvestmentByUserId = (userId: string) => InvestmentModel.findOne
 export const createInvestment = (values: Record<string, any>) => new InvestmentModel(values).save();
 export const updateInvestmentByUserId = (userId: string, values: Record<string, any>) => 
   InvestmentModel.findOneAndUpdate({ userId }, values, { new: true, upsert: true });
-
