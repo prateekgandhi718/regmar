@@ -34,7 +34,7 @@ const providers: ProviderConfig[] = [
     appPasswordSource: 'Google',
     steps: [
       'Sign in to your Google account.',
-      'Create an app password named Regmar.',
+      'Create an app password for FIY (you can name it anything).',
       'Paste the 16-character code here.',
     ],
   },
@@ -49,7 +49,7 @@ const providers: ProviderConfig[] = [
     steps: [
       'Sign in to your Apple ID account.',
       'Open the App-Specific Passwords section and generate a new password.',
-      'Name it Regmar, copy the 16-character code, and paste it here.',
+      'Name it for FIY (or anything), copy the 16-character code, and paste it here.',
     ],
   },
 ]
@@ -201,7 +201,7 @@ const SettingsPage = () => {
           <div className="rounded-2xl border border-border/60 dark:border-white/5 p-4 space-y-4 bg-secondary/20 dark:bg-white/5 text-sm text-foreground/90">
             <p className="font-bold text-base">Why Do I Need an App Password?</p>
             <p>
-              Regmar uses IMAP to read banking alert emails from your mailbox. An app password gives secure, limited access
+              FIY uses IMAP to read banking alert emails from your mailbox. An app password gives secure, limited access
               without using your main account password.
             </p>
             <p className="font-semibold">What&apos;s an App Password?</p>
