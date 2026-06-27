@@ -34,9 +34,9 @@ const TransactionSchema = new mongoose.Schema({
 
 export const TransactionModel = mongoose.model('Transaction', TransactionSchema);
 
-export const getTransactionsByAccountId = (accountId: string) => TransactionModel.find({ accountId }).populate('categoryId');
+export const getTransactionsByAccountId = (accountId: string) => TransactionModel.find({ accountId }).populate('categoryId', 'name');
 export const getTransactionsByUserId = (userId: string) => TransactionModel.find({ userId, isProcessed: true })
-  .populate('categoryId')
+  .populate('categoryId', 'name')
   .populate({
     path: 'accountId',
     populate: { path: 'domainIds' }
@@ -48,7 +48,7 @@ export const getUnprocessedTransactionsByUserAndDomain = (
 ) => TransactionModel.find({ userId, domainId, isProcessed: false });
 export const createTransaction = (values: Record<string, any>) => new TransactionModel(values).save();
 export const updateTransactionById = (id: string, values: Record<string, any>) => TransactionModel.findByIdAndUpdate(id, values, { new: true })
-  .populate('categoryId')
+  .populate('categoryId', 'name')
   .populate({
     path: 'accountId',
     populate: { path: 'domainIds' }

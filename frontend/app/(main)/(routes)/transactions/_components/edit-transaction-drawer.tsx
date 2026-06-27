@@ -15,6 +15,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { CategoryIcon } from '@/components/category-icon'
 
 interface EditTransactionDrawerProps {
   transaction: Transaction | null
@@ -205,12 +206,10 @@ export const EditTransactionDrawer = ({ transaction, isOpen, onClose }: EditTran
                   className="w-full p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl" style={{ color: cat.color }}>
-                      {cat.emoji}
-                    </span>
-                    <span className="text-sm font-black uppercase tracking-tight" style={{ color: cat.color }}>
-                      {cat.name}
-                    </span>
+                    <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+                      <CategoryIcon name={cat.name} className="h-5 w-5" />
+                    </div>
+                    <span className="text-sm font-black uppercase tracking-tight">{cat.name}</span>
                   </div>
                   <div
                     className={cn(
@@ -238,7 +237,7 @@ export const EditTransactionDrawer = ({ transaction, isOpen, onClose }: EditTran
           <Button
             disabled={isUpdating}
             onClick={handleSave}
-            className="rounded-2xl h-14 bg-linear-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white font-black text-sm uppercase tracking-tight shadow-lg shadow-orange-500/20 active:scale-95 transition-all"
+            className="rounded-2xl h-14 bg-linear-to-r from-primary to-primary/70 hover:opacity-90 text-primary-foreground font-black text-sm uppercase tracking-tight shadow-lg shadow-primary/20 active:scale-95 transition-all"
           >
             {isUpdating ? 'Saving...' : 'Save'}
           </Button>

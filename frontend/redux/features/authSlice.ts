@@ -4,6 +4,8 @@ interface User {
   id: string
   email: string
   name?: string
+  pan?: string
+  primaryColor?: string
 }
 
 interface AuthState {
@@ -65,10 +67,17 @@ const authSlice = createSlice({
         localStorage.removeItem('refreshToken')
       }
     },
+    updateUser: (state, { payload }: PayloadAction<Partial<User>>) => {
+      if (!state.user) return
+      state.user = { ...state.user, ...payload }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(state.user))
+      }
+    },
   },
 })
 
-export const { setCredentials, updateAccessToken, logout } = authSlice.actions
+export const { setCredentials, updateAccessToken, logout, updateUser } = authSlice.actions
 
 export default authSlice.reducer
 

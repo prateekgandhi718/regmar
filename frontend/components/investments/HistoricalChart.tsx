@@ -44,8 +44,8 @@ export const HistoricalChart = ({ data, hideValues }: HistoricalChartProps) => {
         <AreaChart data={formattedData}>
           <defs>
             <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+              <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0}/>
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={isDark ? '#ffffff05' : '#00000005'} />
@@ -66,7 +66,7 @@ export const HistoricalChart = ({ data, hideValues }: HistoricalChartProps) => {
               fontWeight: '900',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
             }}
-            itemStyle={{ color: '#6366f1' }}
+            itemStyle={{ color: 'var(--chart-1)' }}
             formatter={(value: number | string | undefined) => {
               if (value === undefined) return ['0', 'Value']
               return [`₹${(Number(value) / 100000).toFixed(2)}L`, 'Value']
@@ -76,7 +76,7 @@ export const HistoricalChart = ({ data, hideValues }: HistoricalChartProps) => {
           <Area 
             type="monotone" 
             dataKey="value" 
-            stroke="#6366f1" 
+            stroke="var(--chart-1)" 
             strokeWidth={4}
             fillOpacity={1} 
             fill="url(#colorValue)" 
@@ -87,4 +87,3 @@ export const HistoricalChart = ({ data, hideValues }: HistoricalChartProps) => {
     </div>
   )
 }
-

@@ -3,6 +3,7 @@
 import { Transaction } from '@/redux/api/transactionsApi'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
+import { CategoryIcon } from '@/components/category-icon'
 
 interface TransactionItemProps {
   transaction: Transaction
@@ -16,9 +17,13 @@ export const TransactionItem = ({ transaction, onClick, onTagClick }: Transactio
 
   return (
     <div onClick={() => onClick?.(transaction)} className="bg-card border-2 border-secondary/50 rounded-4xl p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
-          {isTagged && <div className="h-11 w-11 rounded-2xl bg-secondary/50 flex items-center justify-center text-xl shrink-0 border border-border/50">{transaction.categoryId?.emoji || '💰'}</div>}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+          {isTagged && (
+            <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/15">
+              <CategoryIcon name={transaction.categoryId?.name} className="h-5 w-5" />
+            </div>
+          )}
           <div className="space-y-0.5 min-w-0">
             <p className="text-sm font-black text-muted-foreground truncate uppercase tracking-tight leading-tight">{transaction.newDescription || transaction.originalDescription}</p>
             <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">{transaction.accountId?.title}</p>

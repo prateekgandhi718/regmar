@@ -4,8 +4,6 @@ import { baseQueryWithReauth } from './baseQuery'
 export interface Category {
   _id: string
   name: string
-  emoji: string
-  color?: string
 }
 
 export const categoriesApi = createApi({

@@ -1,8 +1,10 @@
 'use client'
 
+import { useSyncTransactionsMutation } from '@/redux/api/syncApi'
+import { useGetAccountsQuery } from '@/redux/api/accountsApi'
 import { useGetLinkedAccountsQuery } from '@/redux/api/linkedAccountsApi'
 import { useGetTransactionsQuery, Transaction } from '@/redux/api/transactionsApi'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Loader2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -15,8 +17,11 @@ import { TransactionDetailDrawer } from './_components/transaction-detail-drawer
 import { TransactionSummary } from './_components/transaction-summary'
 import { SetupPrompts } from '@/components/setup-prompts'
 import { isExpense, getTransactionAmount } from '@/lib/transactions'
+import { toast } from 'sonner'
 
 const TransactionsPage = () => {
+  const [sync, { isLoading: isSyncing }] = useSyncTransactionsMutation()
+  const { data: accounts } = useGetAccountsQuery()
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery()
   const { data: transactions, isLoading: isLoadingTransactions } = useGetTransactionsQuery()
 
@@ -41,6 +46,18 @@ const TransactionsPage = () => {
   }
 
   const isEmailLinked = linkedAccounts && linkedAccounts.some((acc) => acc.isActive)
+  const hasAccountWithDomain = useMemo(() => accounts && accounts.some((acc) => acc.domainIds && acc.domainIds.length > 0), [accounts])
+
+  const handleSync = async () => {
+    if (!isEmailLinked || !hasAccountWithDomain) return
+    try {
+      const data = await sync().unwrap()
+      toast.success(`${data.transactionsSynced} transactions synced`)
+    } catch (error: any) {
+      console.error('Sync failed:', error)
+      toast.error(error?.data?.message || 'Sync failed.')
+    }
+  }
 
   // Group transactions by Month/Year and then by Day
   const groupedTransactions = useMemo(() => {
@@ -138,8 +155,25 @@ const TransactionsPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black tracking-tight">Transactions</h1>
         <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSync}
+            disabled={isSyncing || !isEmailLinked || !hasAccountWithDomain}
+            className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4"
+          >
+            {isSyncing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sync
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" /> Sync
+              </>
+            )}
+          </Button>
           {selectedMonthYear && (
-            <Button variant="secondary" size="sm" className="rounded-xl font-bold bg-orange-100 text-orange-600 border-none h-9 px-4 hover:bg-orange-200" onClick={() => setSelectedMonthYear(null)}>
+            <Button variant="secondary" size="sm" className="rounded-xl font-bold bg-primary/15 text-primary border-none h-9 px-4 hover:bg-primary/20" onClick={() => setSelectedMonthYear(null)}>
               {selectedMonthYear} <span className="ml-1 opacity-50">×</span>
             </Button>
           )}

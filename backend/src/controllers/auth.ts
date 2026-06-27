@@ -66,6 +66,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
         id: user._id,
         email: user.email,
         name: user.name,
+        pan: user.pan,
+        primaryColor: user.primaryColor,
       },
     });
   } catch (error) {
