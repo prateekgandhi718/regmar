@@ -6,8 +6,6 @@ export interface Domain {
   userId: string
   accountId: string
   fromEmail: string
-  subject?: string
-  regexIds: string[]
 }
 
 export interface Account {

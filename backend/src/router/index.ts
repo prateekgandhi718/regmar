@@ -4,7 +4,6 @@ import masterData from './masterData';
 import accounts from './accounts';
 import linkedAccounts from './linkedAccounts';
 import sync from './sync';
-import ai from './ai';
 import transactions from './transactions';
 import users from './users';
 import investments from './investments';
@@ -20,7 +19,6 @@ export default (): express.Router => {
   accounts(router);
   linkedAccounts(router);
   sync(router);
-  ai(router);
   transactions(router);
   users(router);
   investments(router);
