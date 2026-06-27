@@ -1,20 +1,62 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, Mail, Lock, ExternalLink, ArrowLeft, Loader2, User, Moon, LogOut, MailCheckIcon } from 'lucide-react'
+import { ChevronRight, Mail, ExternalLink, ArrowLeft, Loader2, User, Moon, LogOut, MailCheckIcon, Cloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ModeToggle } from '@/components/mode-toggle'
-import { useGetLinkedAccountsQuery, useLinkGmailAccountMutation, useUnlinkAccountMutation } from '@/redux/api/linkedAccountsApi'
+import { LinkedAccountProvider, useGetLinkedAccountsQuery, useLinkEmailAccountMutation, useUnlinkAccountMutation } from '@/redux/api/linkedAccountsApi'
 import { useSelector, useDispatch } from 'react-redux'
 import { selectCurrentUser, logout } from '@/redux/features/authSlice'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
-const providers = [{ id: 'gmail', name: 'Gmail', icon: Mail, color: 'text-rose-500', enabled: true }]
+type ProviderConfig = {
+  id: LinkedAccountProvider
+  name: string
+  icon: typeof Mail
+  color: string
+  emailPlaceholder: string
+  appPasswordUrl: string
+  appPasswordSource: string
+  steps: string[]
+}
+
+const providers: ProviderConfig[] = [
+  {
+    id: 'gmail',
+    name: 'Gmail',
+    icon: Mail,
+    color: 'text-rose-500',
+    emailPlaceholder: 'name@gmail.com',
+    appPasswordUrl: 'https://myaccount.google.com/apppasswords',
+    appPasswordSource: 'Google',
+    steps: [
+      'Sign in to your Google account.',
+      'Create an app password for FIY (you can name it anything).',
+      'Paste the 16-character code here.',
+    ],
+  },
+  {
+    id: 'icloud',
+    name: 'iCloud',
+    icon: Cloud,
+    color: 'text-sky-500',
+    emailPlaceholder: 'name@icloud.com',
+    appPasswordUrl: 'https://appleid.apple.com/account/manage',
+    appPasswordSource: 'Apple ID',
+    steps: [
+      'Sign in to your Apple ID account.',
+      'Open the App-Specific Passwords section and generate a new password.',
+      'Name it for FIY (or anything), copy the 16-character code, and paste it here.',
+    ],
+  },
+]
 
 const SettingsPage = () => {
-  const [step, setStep] = useState<'selection' | 'gmail-form'>('selection')
+  const [step, setStep] = useState<'selection' | 'provider-form'>('selection')
+  const [selectedProvider, setSelectedProvider] = useState<LinkedAccountProvider>('gmail')
   const [email, setEmail] = useState('')
   const [appPassword, setAppPassword] = useState('')
   const [isPasswordPrefilled, setIsPasswordPrefilled] = useState(false)
@@ -24,37 +66,42 @@ const SettingsPage = () => {
   const dispatch = useDispatch()
 
   const { data: linkedAccounts } = useGetLinkedAccountsQuery()
-  const [linkGmail, { isLoading: isLinking }] = useLinkGmailAccountMutation()
+  const [linkEmail, { isLoading: isLinking }] = useLinkEmailAccountMutation()
   const [unlinkAccount, { isLoading: isUnlinking }] = useUnlinkAccountMutation()
 
-  const activeGmail = linkedAccounts?.find((acc) => acc.provider === 'gmail' && acc.isActive)
+  const linkedEmailAccount = linkedAccounts?.find((acc) => acc.isActive)
+  const activeProvider = linkedEmailAccount?.provider === 'icloud' ? 'icloud' : 'gmail'
+  const selectedProviderConfig = providers.find((provider) => provider.id === selectedProvider) ?? providers[0]
 
   const maskedPassword = '*'.repeat(16)
-  const isEditing = Boolean(activeGmail)
+  const isEditing = Boolean(linkedEmailAccount)
   const isEmailChanged = email.trim() !== initialEmail.trim()
   const isPasswordChanged = !isPasswordPrefilled
   const isPasswordValid = appPassword.length === 16
+  const isPasswordRequired = !isEditing || isPasswordChanged || isEmailChanged
   const isSaveDisabled =
     isLinking ||
     !email ||
-    (!isEditing && !isPasswordValid) ||
     (isEditing && !isEmailChanged && !isPasswordChanged) ||
-    (isEditing && isPasswordChanged && !isPasswordValid)
+    (isPasswordRequired && !isPasswordValid)
 
   const handleLink = async () => {
-    const shouldSendPassword = !isPasswordPrefilled
+    const shouldSendPassword = !isPasswordPrefilled || isEmailChanged
     if (!email) return
-    if (!shouldSendPassword && !isEditing) return
     if (shouldSendPassword && appPassword.length !== 16) return
     try {
-      await linkGmail({ email, appPassword: shouldSendPassword ? appPassword : '' }).unwrap()
+      const response = await linkEmail({ provider: selectedProvider, email, appPassword: shouldSendPassword ? appPassword : '' }).unwrap()
+      toast.success(response.message || 'Email account connected')
       setStep('selection')
+      setSelectedProvider('gmail')
       setEmail('')
       setAppPassword('')
       setIsPasswordPrefilled(false)
       setInitialEmail('')
     } catch (error) {
-      console.error('Failed to link Gmail:', error)
+      const apiError = error as { data?: { message?: string } }
+      toast.error(apiError?.data?.message || 'Could not connect. Please check your app password.')
+      console.error('Failed to link email account:', error)
     }
   }
 
@@ -67,7 +114,7 @@ const SettingsPage = () => {
     }
   }
 
-  if (step === 'gmail-form') {
+  if (step === 'provider-form') {
     return (
       <div className="max-w-2xl mx-auto p-6 space-y-8 pb-24">
         <div className="flex items-center gap-4">
@@ -77,6 +124,7 @@ const SettingsPage = () => {
             className="rounded-xl"
             onClick={() => {
               setStep('selection')
+              setSelectedProvider('gmail')
               setEmail('')
               setAppPassword('')
               setIsPasswordPrefilled(false)
@@ -85,30 +133,33 @@ const SettingsPage = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-black tracking-tight text-primary dark:text-white">Gmail Setup</h1>
+          <h1 className="text-2xl font-black tracking-tight text-primary dark:text-white">Link Email Account</h1>
         </div>
 
         <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-3xl p-6 space-y-6 shadow-sm">
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Add your Gmail address and app password to sync transactions.</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{selectedProviderConfig.name}</p>
+            <p className="text-sm text-muted-foreground">
+              Link the email where you receive banking alerts and statements.
+            </p>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="gmail-email">Email</Label>
+              <Label htmlFor="provider-email">Email</Label>
                 <Input
-                  id="gmail-email"
+                  id="provider-email"
                   type="email"
-                  placeholder="name@gmail.com"
+                  placeholder={selectedProviderConfig.emailPlaceholder}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="bg-transparent"
                 />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gmail-password">App password</Label>
+              <Label htmlFor="provider-password">App password</Label>
               <Input
-                id="gmail-password"
+                id="provider-password"
                 type="password"
                 placeholder="16-character app password"
                 value={appPassword}
@@ -124,7 +175,9 @@ const SettingsPage = () => {
                 }}
                 className="bg-transparent"
               />
-              <p className="text-xs text-muted-foreground">Use a 16-character app-specific password from your Google account.</p>
+              <p className="text-xs text-muted-foreground">
+                Use a 16-character app-specific password from your {selectedProviderConfig.name} account.
+              </p>
             </div>
           </div>
 
@@ -132,17 +185,33 @@ const SettingsPage = () => {
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Create App Password</p>
               <Button variant="outline" className="h-7 p-2 rounded-xl" asChild>
-                <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">
-                  Open Google
+                <a href={selectedProviderConfig.appPasswordUrl} target="_blank" rel="noopener noreferrer">
+                  Open {selectedProviderConfig.appPasswordSource}
                   <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
               </Button>
             </div>
             <div className="space-y-2 text-xs text-muted-foreground">
-              <p>1. Sign in to your Google account.</p>
-              <p>2. Create an app password named Regmar.</p>
-              <p>3. Paste the 16-character code here.</p>
+              {selectedProviderConfig.steps.map((stepText, index) => (
+                <p key={`${selectedProviderConfig.id}-${index}`}>{index + 1}. {stepText}</p>
+              ))}
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-border/60 dark:border-white/5 p-4 space-y-4 bg-secondary/20 dark:bg-white/5 text-sm text-foreground/90">
+            <p className="font-bold text-base">Why Do I Need an App Password?</p>
+            <p>
+              FIY uses IMAP to read banking alert emails from your mailbox. An app password gives secure, limited access
+              without using your main account password.
+            </p>
+            <p className="font-semibold">What&apos;s an App Password?</p>
+            <p>
+              It&apos;s a one-time password generated by your email provider for this app. You can revoke it anytime from provider settings.
+            </p>
+            <p className="font-semibold">Is It Safe?</p>
+            <p>
+              Yes. App passwords only grant mailbox access for this connection and do not expose your primary login password.
+            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -172,7 +241,7 @@ const SettingsPage = () => {
           Email Sync
         </h2>
         <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-3xl p-6 space-y-6 shadow-sm">
-          {activeGmail ? (
+          {linkedEmailAccount ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between rounded-2xl border border-border dark:border-white/5 p-4 bg-secondary/20 dark:bg-white/5">
                 <div className="flex items-center gap-3 min-w-0">
@@ -180,7 +249,8 @@ const SettingsPage = () => {
                     <MailCheckIcon className="h-5 w-5 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-primary dark:text-white truncate">{activeGmail.email}</p>
+                    <p className="font-semibold text-primary dark:text-white truncate">{linkedEmailAccount.email}</p>
+                    <p className="text-xs text-muted-foreground">{activeProvider === 'icloud' ? 'iCloud' : 'Gmail'}</p>
                   </div>
                 </div>
                 <span className="text-xs font-semibold text-muted-foreground">Connected</span>
@@ -190,11 +260,12 @@ const SettingsPage = () => {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setEmail(activeGmail.email)
-                    setInitialEmail(activeGmail.email)
+                    setSelectedProvider(activeProvider)
+                    setEmail(linkedEmailAccount.email)
+                    setInitialEmail(linkedEmailAccount.email)
                     setAppPassword(maskedPassword)
                     setIsPasswordPrefilled(true)
-                    setStep('gmail-form')
+                    setStep('provider-form')
                   }}
                   className="h-11 rounded-2xl font-semibold"
                 >
@@ -202,17 +273,19 @@ const SettingsPage = () => {
                 </Button>
                 <Button
                   variant="ghost"
-                  onClick={() => handleUnlink(activeGmail.id)}
+                  onClick={() => handleUnlink(linkedEmailAccount.id)}
                   disabled={isUnlinking}
                   className="h-11 rounded-2xl font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10"
                 >
-                  {isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Unlink Gmail'}
+                  {isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Unlink Email'}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Connect your email account to automatically track your statements.</p>
+              <p className="text-sm text-muted-foreground">
+                Link the inbox where you receive banking alerts to automatically fetch statements and transactions.
+              </p>
 
               <div className="grid grid-cols-1 gap-2">
                 {providers.map((provider) => (
@@ -225,7 +298,8 @@ const SettingsPage = () => {
                       setInitialEmail('')
                       setAppPassword('')
                       setIsPasswordPrefilled(false)
-                      setStep('gmail-form')
+                      setSelectedProvider(provider.id)
+                      setStep('provider-form')
                     }}
                   >
                     <div className="flex items-center gap-3">

@@ -21,10 +21,10 @@ export const Heading = () => {
     return (
       <div className="max-w-3xl space-y-4">
         <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold">
-          Your financial transactions, travel plans and newsletters. Unified. Welcome to <span className="underline">Regmar</span>
+          Your transactions and investments. Unified. Welcome to <span className="underline">FIY</span>
         </h1>
         <h3 className="text-base sm:text-xl md:text-2xl font-medium">
-          Regmar helps you smooth the information overload <br /> just like sandpaper.
+          FIY automatically fetches and organizes your financial activity.
         </h3>
         <div className="w-full flex items-center justify-center">
           <Spinner size="lg" />
@@ -36,22 +36,22 @@ export const Heading = () => {
   return (
     <div className="max-w-3xl space-y-4">
       <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold">
-        Your financial transactions, travel plans and newsletters. Unified. Welcome to <span className="underline">Regmar</span>
+        Your transactions and investments. Unified. Welcome to <span className="underline">FIY</span>
       </h1>
       <h3 className="text-base sm:text-xl md:text-2xl font-medium">
-        Regmar helps you smooth the information overload <br /> just like sandpaper.
+        FIY automatically fetches and organizes your financial activity.
       </h3>
       {user ? (
         <Button asChild>
           <Link href="/home">
-            Enter Regmar
+            Enter FIY
             <ArrowRight className="h-4 w-4 ml-2" />
           </Link>
         </Button>
       ) : (
         <Button asChild>
           <Link href="/signup">
-            Get Regmar Free
+            Get FIY Free
             <ArrowRight className="h-4 w-4 ml-2" />
           </Link>
         </Button>

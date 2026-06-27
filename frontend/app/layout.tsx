@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Regmar - Manage your financial transactions, travel plans and newsletters',
-  description: 'Regmar helps you smooth the information overload just like sandpaper.',
+  title: 'FIY - Automated transactions and investments',
+  description: 'FIY helps you track automated transactions and investments in one place.',
 }
 
 export default function RootLayout({

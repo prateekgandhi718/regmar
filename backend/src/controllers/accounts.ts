@@ -89,7 +89,7 @@ export const addUserAccount = async (
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
     if (!linkedAccount) {
       return res.status(403).json({
-        message: "Please link a Gmail account in settings before adding bank accounts.",
+        message: "Please link an email account in settings before adding bank accounts.",
       });
     }
 
@@ -146,7 +146,7 @@ export const updateAccount = async (
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
     if (!linkedAccount) {
       return res.status(403).json({
-        message: "Please link a Gmail account in settings before updating bank accounts.",
+        message: "Please link an email account in settings before updating bank accounts.",
       });
     }
 

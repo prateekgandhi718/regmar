@@ -13,6 +13,7 @@ import { decrypt } from "../helpers/encryption";
 import {
   fetchEmailsIncrementally,
   fetchLatestEmailWithAttachment,
+  isImapAuthError,
 } from "../helpers/imap";
 import { getUserById } from "../db/userModel";
 import {
@@ -23,14 +24,6 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 import { parseCASText } from "../helpers/casParser";
 import { ClassifyEmailResponse, ClassifyTransactionTypeResponse, EntityData, ExtractEntitiesResponse, TestResultEntry } from "../helpers/syncTransactions";
 import { processEmailWithPython } from "../helpers/txnProcessing";
-
-const isImapAuthError = (error: any) => {
-  if (!error) return false;
-  if (error.authenticationFailed) return true;
-  if (error.serverResponseCode === "AUTHENTICATIONFAILED") return true;
-  const text = `${error.responseText || ""} ${error.message || ""}`;
-  return /AUTHENTICATIONFAILED|Invalid credentials/i.test(text);
-};
 
 export const syncInvestments = async (
   req: AuthRequest,
@@ -48,19 +41,21 @@ export const syncInvestments = async (
         .json({ message: "PAN number not found. Please update your profile." });
     }
 
-    // 2. Get active Gmail link
+    // 2. Get active linked email account
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
-    if (!linkedAccount || linkedAccount.provider !== "gmail") {
+    if (!linkedAccount) {
       return res
         .status(400)
-        .json({ message: "Please link a Gmail account first" });
+        .json({ message: "Please link an email account first" });
     }
 
     const appPassword = decrypt(linkedAccount.appPassword);
     const email = linkedAccount.email;
+    const provider = linkedAccount.provider === "icloud" ? "icloud" : "gmail";
 
     // 3. Fetch latest CAS email from CDSL
     const { attachment, date, uid } = await fetchLatestEmailWithAttachment(
+      provider,
       email,
       appPassword,
       "ecas@cdslstatement.com",
@@ -167,7 +162,7 @@ export const syncInvestments = async (
     console.error("Investment sync error:", error);
     if (isImapAuthError(error)) {
       return res.status(400).json({
-        message: "Gmail authentication failed. Please update your app password in Settings.",
+        message: "Email authentication failed. Please update your app password in Settings.",
       });
     }
     return res
@@ -184,16 +179,17 @@ export const syncAccountTransactions = async (
     const userId = req.userId;
     if (!userId) return res.sendStatus(401);
 
-    // 1. Active Gmail link
+    // 1. Active linked email account
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
-    if (!linkedAccount || linkedAccount.provider !== "gmail") {
+    if (!linkedAccount) {
       return res
         .status(400)
-        .json({ message: "Please link a Gmail account first" });
+        .json({ message: "Please link an email account first" });
     }
 
     const appPassword = decrypt(linkedAccount.appPassword);
     const email = linkedAccount.email;
+    const provider = linkedAccount.provider === "icloud" ? "icloud" : "gmail";
 
     // 2. Accounts with domains
     const accounts = await getAccountsByUserId(userId);
@@ -234,6 +230,7 @@ export const syncAccountTransactions = async (
 
         // 4. Fetch emails
         const { emails, lastUid: newLastUid } = await fetchEmailsIncrementally(
+          provider,
           email,
           appPassword,
           domain.fromEmail,
@@ -392,7 +389,7 @@ export const syncAccountTransactions = async (
     console.error("Sync error:", error);
     if (isImapAuthError(error)) {
       return res.status(400).json({
-        message: "Gmail authentication failed. Please update your app password in Settings.",
+        message: "Email authentication failed. Please update your app password in Settings.",
       });
     }
     return res.status(500).json({
@@ -418,20 +415,22 @@ export const testClassifier = async (
       return res.status(400).json({ message: "domainEmail is required" });
     }
 
-    // 1. Get Gmail account
+    // 1. Get linked email account
     const linkedAccount = await getActiveLinkedAccountByUserId(userId);
-    if (!linkedAccount || linkedAccount.provider !== "gmail") {
+    if (!linkedAccount) {
       return res
         .status(400)
-        .json({ message: "Please link a Gmail account first" });
+        .json({ message: "Please link an email account first" });
     }
 
     const appPassword = decrypt(linkedAccount.appPassword);
     const email = linkedAccount.email;
+    const provider = linkedAccount.provider === "icloud" ? "icloud" : "gmail";
 
     // 2. Fetch sample emails from domain
     console.log(`Fetching sample emails from ${domainEmail}...`);
     const { emails } = await fetchEmailsIncrementally(
+      provider,
       email,
       appPassword,
       domainEmail,
