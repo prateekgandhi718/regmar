@@ -1,4 +1,0 @@
-FROM koyeb/docker-compose
-
-# Copy repository into the image where the Koyeb Docker Compose image expects it
-COPY . /app
