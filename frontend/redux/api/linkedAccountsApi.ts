@@ -8,6 +8,13 @@ export interface LinkedAccount {
   isActive: boolean
 }
 
+export type LinkedAccountProvider = 'gmail' | 'icloud'
+
+interface LinkEmailAccountResponse {
+  message: string
+  linkedAccount: LinkedAccount
+}
+
 export const linkedAccountsApi = createApi({
   reducerPath: 'linkedAccountsApi',
   baseQuery: baseQueryWithReauth,
@@ -17,9 +24,9 @@ export const linkedAccountsApi = createApi({
       query: () => '/linked-accounts',
       providesTags: ['LinkedAccount'],
     }),
-    linkGmailAccount: builder.mutation<LinkedAccount, { email: string; appPassword: string }>({
-      query: (body) => ({
-        url: '/linked-accounts/gmail',
+    linkEmailAccount: builder.mutation<LinkEmailAccountResponse, { provider: LinkedAccountProvider; email: string; appPassword: string }>({
+      query: ({ provider, ...body }) => ({
+        url: `/linked-accounts/${provider}`,
         method: 'POST',
         body,
       }),
@@ -35,4 +42,4 @@ export const linkedAccountsApi = createApi({
   }),
 })
 
-export const { useGetLinkedAccountsQuery, useLinkGmailAccountMutation, useUnlinkAccountMutation } = linkedAccountsApi
+export const { useGetLinkedAccountsQuery, useLinkEmailAccountMutation, useUnlinkAccountMutation } = linkedAccountsApi

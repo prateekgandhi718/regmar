@@ -24,7 +24,7 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery()
-  const isLinked = linkedAccounts && linkedAccounts.some((acc) => acc.isActive && acc.provider === 'gmail')
+  const isLinked = linkedAccounts && linkedAccounts.some((acc) => acc.isActive)
 
   const [addAccount] = useAddAccountMutation()
   const [updateAccount] = useUpdateAccountMutation()
@@ -126,7 +126,7 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
               <div className="space-y-2">
                 <p className="text-sm font-bold text-orange-800">Email Account Required</p>
                 <p className="text-xs text-orange-700 leading-relaxed">
-                  You need to link a Gmail account in settings before you can add bank accounts. This allows us to fetch transactions automatically.
+                  Link the email account where you receive banking alerts before adding bank accounts. This allows automatic transaction sync.
                 </p>
                 <Button variant="link" className="p-0 h-auto text-xs text-orange-800 font-bold underline" asChild>
                   <Link href="/settings">Go to Settings</Link>

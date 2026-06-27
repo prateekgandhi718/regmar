@@ -7,7 +7,50 @@ interface FetchResult {
   lastUid: number;
 }
 
+export type SupportedProvider = 'gmail' | 'icloud';
+
+const getImapHostByProvider = (provider: SupportedProvider) => {
+  if (provider === 'icloud') return 'imap.mail.me.com';
+  return 'imap.gmail.com';
+};
+
+export const isImapAuthError = (error: any) => {
+  if (!error) return false;
+  if (error.authenticationFailed) return true;
+  if (error.serverResponseCode === 'AUTHENTICATIONFAILED') return true;
+  const text = `${error.responseText || ''} ${error.message || ''}`;
+  return /AUTHENTICATIONFAILED|Invalid credentials|authentication failed|login failed|bad credentials/i.test(text);
+};
+
+export const verifyImapCredentials = async (
+  provider: SupportedProvider,
+  email: string,
+  appPassword: string
+) => {
+  const client = new ImapFlow({
+    host: getImapHostByProvider(provider),
+    port: 993,
+    secure: true,
+    auth: {
+      user: email,
+      pass: appPassword,
+    },
+    logger: false,
+  });
+
+  try {
+    await client.connect();
+    await client.logout();
+  } catch (error) {
+    try {
+      await client.logout();
+    } catch (logoutError) {}
+    throw error;
+  }
+};
+
 export const fetchEmailsIncrementally = async (
+  provider: SupportedProvider,
   email: string,
   appPassword: string,
   fromEmail: string,
@@ -17,7 +60,7 @@ export const fetchEmailsIncrementally = async (
   keyword?: string
 ): Promise<FetchResult> => {
   const client = new ImapFlow({
-    host: 'imap.gmail.com',
+    host: getImapHostByProvider(provider),
     port: 993,
     secure: true,
     auth: {
@@ -119,13 +162,14 @@ export const fetchEmailsIncrementally = async (
 };
 
 export const fetchLatestEmailWithAttachment = async (
+  provider: SupportedProvider,
   email: string,
   appPassword: string,
   fromEmail: string,
   fileNamePattern?: string
 ): Promise<{ attachment: Buffer | null; date: Date | null; uid: number | null }> => {
   const client = new ImapFlow({
-    host: 'imap.gmail.com',
+    host: getImapHostByProvider(provider),
     port: 993,
     secure: true,
     auth: {
@@ -176,6 +220,7 @@ export const fetchLatestEmailWithAttachment = async (
 };
 
 export const fetchDiverseSamples = async (
+  provider: SupportedProvider,
   email: string,
   appPassword: string,
   fromEmail: string,
@@ -183,7 +228,7 @@ export const fetchDiverseSamples = async (
   creditKeywords: string[]
 ): Promise<{ debitBuckets: string[][], creditBuckets: string[][] }> => {
   const client = new ImapFlow({
-    host: 'imap.gmail.com',
+    host: getImapHostByProvider(provider),
     port: 993,
     secure: true,
     auth: {

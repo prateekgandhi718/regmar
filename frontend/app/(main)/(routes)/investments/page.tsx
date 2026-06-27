@@ -4,12 +4,14 @@ import { useState } from 'react'
 import { useGetMeQuery, useUpdateProfileMutation } from '@/redux/api/authApi'
 import { useSyncInvestmentsMutation } from '@/redux/api/syncApi'
 import { useGetMyInvestmentsQuery } from '@/redux/api/investmentsApi'
+import { useGetLinkedAccountsQuery } from '@/redux/api/linkedAccountsApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SummaryCard } from '@/components/investments/SummaryCard'
 import { HistoricalChart } from '@/components/investments/HistoricalChart'
 import { AllocationPieChart } from '@/components/investments/AllocationPieChart'
+import { EmailLinkPrompt } from '@/components/setup-prompts'
 import { Loader2, ShieldCheck, RefreshCw, Layers, TrendingUp, Eye, EyeOff } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { StatementPeriod } from './_components/StatementPeriod'
@@ -31,14 +33,16 @@ const InvestmentsPage = () => {
 
   const { data: user, isLoading: isUserLoading } = useGetMeQuery()
   const { data: investments, isLoading: isInvestmentsLoading } = useGetMyInvestmentsQuery()
+  const { data: linkedAccounts, isLoading: isLinkedAccountsLoading } = useGetLinkedAccountsQuery()
 
   const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation()
   const [syncInvestments, { isLoading: isSyncing }] = useSyncInvestmentsMutation()
 
   const [panInput, setPanInput] = useState<string | null>(null)
   const [hideValues, setHideValues] = useState(false)
+  const isEmailLinked = !!linkedAccounts?.some((acc) => acc.isActive)
 
-  if (isUserLoading || isInvestmentsLoading) {
+  if (isUserLoading || isInvestmentsLoading || isLinkedAccountsLoading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -63,6 +67,8 @@ const InvestmentsPage = () => {
   }
 
   const handleSync = async () => {
+    if (!isEmailLinked) return
+
     try {
       const result = await syncInvestments().unwrap()
       toast.success(result.message)
@@ -130,6 +136,8 @@ const InvestmentsPage = () => {
         </div>
       ) : (
         <div className="space-y-8">
+          {!isEmailLinked && <EmailLinkPrompt />}
+
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black">Your summary</h2>
 
@@ -137,7 +145,7 @@ const InvestmentsPage = () => {
               variant="secondary"
               size="sm"
               onClick={handleSync}
-              disabled={isSyncing}
+              disabled={isSyncing || !isEmailLinked}
               className="rounded-xl font-bold bg-secondary/50 text-primary border-none h-9 px-4"
             >
               {isSyncing ? <Loader2 className="animate-spin mr-2" /> : <RefreshCw className="mr-2" />}

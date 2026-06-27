@@ -17,7 +17,7 @@ const HomePage = () => {
   const { data: linkedAccounts, isLoading: isLoadingLinked } = useGetLinkedAccountsQuery()
   const { data: transactions, isLoading: isLoadingTransactions } = useGetTransactionsQuery()
 
-  const isEmailLinked = useMemo(() => linkedAccounts && linkedAccounts.some((acc) => acc.isActive && acc.provider === 'gmail'), [linkedAccounts])
+  const isEmailLinked = useMemo(() => linkedAccounts && linkedAccounts.some((acc) => acc.isActive), [linkedAccounts])
 
   const hasAccountWithDomain = useMemo(() => accounts && accounts.some((acc) => acc.domainIds && acc.domainIds.length > 0), [accounts])
 
