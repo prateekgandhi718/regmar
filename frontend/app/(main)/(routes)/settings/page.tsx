@@ -94,7 +94,7 @@ const SettingsPage = () => {
     () => [
       { name: 'Orange', value: '#f97316' },
       { name: 'Blue', value: '#3b82f6' },
-      { name: 'Emerald', value: '#10b981' },
+      { name: 'Amber', value: '#f59e0b' },
       { name: 'Violet', value: '#8b5cf6' },
       { name: 'Rose', value: '#f43f5e' },
     ],

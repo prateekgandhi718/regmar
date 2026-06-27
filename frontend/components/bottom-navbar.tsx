@@ -1,9 +1,10 @@
 'use client'
 
-import { Home, CreditCard, TrendingUp, Settings, Wallet } from 'lucide-react'
+import { CreditCard, TrendingUp, Settings, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { AppMark } from '@/components/app-mark'
 
 const BottomNavbar = () => {
   const pathname = usePathname()
@@ -11,7 +12,7 @@ const BottomNavbar = () => {
   const tabs = [
     {
       label: 'Home',
-      icon: Home,
+      icon: AppMark,
       href: '/home',
     },
     {
