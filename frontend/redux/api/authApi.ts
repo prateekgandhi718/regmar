@@ -6,6 +6,7 @@ export interface User {
   email: string
   name?: string
   pan?: string
+  primaryColor?: string
 }
 
 export const authApi = createApi({
@@ -20,6 +21,14 @@ export const authApi = createApi({
     updateProfile: builder.mutation<User, { name?: string; pan?: string }>({
       query: (body) => ({
         url: '/users/profile',
+        method: 'PATCH',
+        body,
+      }),
+      invalidatesTags: ['User'],
+    }),
+    updatePreferences: builder.mutation<User, { primaryColor: string }>({
+      query: (body) => ({
+        url: '/users/preferences',
         method: 'PATCH',
         body,
       }),
@@ -46,5 +55,6 @@ export const {
   useRequestOtpMutation, 
   useVerifyOtpMutation, 
   useGetMeQuery, 
-  useUpdateProfileMutation 
+  useUpdateProfileMutation,
+  useUpdatePreferencesMutation,
 } = authApi

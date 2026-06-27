@@ -15,7 +15,7 @@ export const AccountsHeader = ({ onAdd, search, setSearch }: AccountsHeaderProps
     <div className="space-y-8 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-black tracking-tight">Accounts</h1>
-        <Button onClick={onAdd} variant="ghost" className="text-orange-500 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 font-semibold flex items-center gap-1">
+        <Button onClick={onAdd} variant="ghost" className="text-primary hover:text-primary/90 hover:bg-primary/10 dark:hover:bg-primary/10 font-semibold flex items-center gap-1">
           <Plus className="h-5 w-5" />
           Add
         </Button>

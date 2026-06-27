@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Mail, ExternalLink, ArrowLeft, Loader2, User, Moon, LogOut, MailCheckIcon, Cloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,9 +8,12 @@ import { Label } from '@/components/ui/label'
 import { ModeToggle } from '@/components/mode-toggle'
 import { LinkedAccountProvider, useGetLinkedAccountsQuery, useLinkEmailAccountMutation, useUnlinkAccountMutation } from '@/redux/api/linkedAccountsApi'
 import { useSelector, useDispatch } from 'react-redux'
-import { selectCurrentUser, logout } from '@/redux/features/authSlice'
+import { selectCurrentUser, logout, updateUser } from '@/redux/features/authSlice'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useUpdatePreferencesMutation } from '@/redux/api/authApi'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 
 type ProviderConfig = {
   id: LinkedAccountProvider
@@ -61,6 +64,8 @@ const SettingsPage = () => {
   const [appPassword, setAppPassword] = useState('')
   const [isPasswordPrefilled, setIsPasswordPrefilled] = useState(false)
   const [initialEmail, setInitialEmail] = useState('')
+  const [isMobile, setIsMobile] = useState(false)
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
 
   const user = useSelector(selectCurrentUser)
   const dispatch = useDispatch()
@@ -68,6 +73,49 @@ const SettingsPage = () => {
   const { data: linkedAccounts } = useGetLinkedAccountsQuery()
   const [linkEmail, { isLoading: isLinking }] = useLinkEmailAccountMutation()
   const [unlinkAccount, { isLoading: isUnlinking }] = useUnlinkAccountMutation()
+  const [updatePreferences, { isLoading: isUpdatingPreferences }] = useUpdatePreferencesMutation()
+
+  const defaultPrimary = '#f97316'
+  const [primaryColor, setPrimaryColor] = useState(user?.primaryColor || defaultPrimary)
+
+  useEffect(() => {
+    setPrimaryColor(user?.primaryColor || defaultPrimary)
+  }, [user?.primaryColor])
+
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 640px)')
+    const update = () => setIsMobile(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [])
+
+  const primaryPresets = useMemo(
+    () => [
+      { name: 'Orange', value: '#f97316' },
+      { name: 'Blue', value: '#3b82f6' },
+      { name: 'Emerald', value: '#10b981' },
+      { name: 'Violet', value: '#8b5cf6' },
+      { name: 'Rose', value: '#f43f5e' },
+    ],
+    [],
+  )
+
+  const isPrimaryValid = /^#[0-9a-fA-F]{6}$/.test(primaryColor)
+  const isPrimaryDirty = primaryColor !== (user?.primaryColor || defaultPrimary)
+
+  const savePrimaryColor = async () => {
+    if (!isPrimaryValid || !isPrimaryDirty) return
+    try {
+      const updated = await updatePreferences({ primaryColor }).unwrap()
+      dispatch(updateUser({ primaryColor: updated.primaryColor }))
+      toast.success('Primary color updated')
+      setColorPickerOpen(false)
+    } catch (error) {
+      const apiError = error as { data?: { message?: string } }
+      toast.error(apiError?.data?.message || 'Could not update primary color')
+    }
+  }
 
   const linkedEmailAccount = linkedAccounts?.find((acc) => acc.isActive)
   const activeProvider = linkedEmailAccount?.provider === 'icloud' ? 'icloud' : 'gmail'
@@ -84,6 +132,55 @@ const SettingsPage = () => {
     !email ||
     (isEditing && !isEmailChanged && !isPasswordChanged) ||
     (isPasswordRequired && !isPasswordValid)
+
+  const PrimaryColorPickerBody = (
+    <div className="space-y-4">
+      <div className="grid grid-cols-5 gap-2">
+        {primaryPresets.map((preset) => (
+          <button
+            key={preset.value}
+            type="button"
+            onClick={() => setPrimaryColor(preset.value)}
+            className={cn(
+              'h-10 w-full rounded-xl border transition-all',
+              primaryColor.toLowerCase() === preset.value.toLowerCase()
+                ? 'border-primary ring-2 ring-primary/30'
+                : 'border-border/60 hover:border-border',
+            )}
+            style={{ backgroundColor: preset.value }}
+            title={preset.name}
+            aria-label={preset.name}
+          />
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="primaryColorHex">Custom hex</Label>
+        <div className="flex items-center gap-2">
+          <div
+            className="h-10 w-10 rounded-xl border border-border/60"
+            style={{ backgroundColor: isPrimaryValid ? primaryColor : 'transparent' }}
+          />
+          <Input
+            id="primaryColorHex"
+            value={primaryColor}
+            onChange={(e) => setPrimaryColor(e.target.value.trim())}
+            placeholder="#f97316"
+            className="font-mono"
+          />
+        </div>
+        {!isPrimaryValid && <p className="text-xs text-muted-foreground">Enter a valid hex color like #1a2b3c.</p>}
+      </div>
+
+      <Button
+        className="w-full rounded-xl font-bold"
+        disabled={isUpdatingPreferences || !isPrimaryValid || !isPrimaryDirty}
+        onClick={savePrimaryColor}
+      >
+        Save
+      </Button>
+    </div>
+  )
 
   const handleLink = async () => {
     const shouldSendPassword = !isPasswordPrefilled || isEmailChanged
@@ -275,7 +372,7 @@ const SettingsPage = () => {
                   variant="ghost"
                   onClick={() => handleUnlink(linkedEmailAccount.id)}
                   disabled={isUnlinking}
-                  className="h-11 rounded-2xl font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10"
+                  className="h-11 rounded-2xl font-semibold text-primary hover:bg-primary/10"
                 >
                   {isUnlinking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Unlink Email'}
                 </Button>
@@ -321,18 +418,62 @@ const SettingsPage = () => {
           <Moon className="h-5 w-5" />
           Appearance
         </h2>
-        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-6 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="font-bold text-lg text-primary dark:text-white">Theme</p>
-            <p className="text-sm text-muted-foreground font-medium">Switch between light and dark mode</p>
+        <div className="bg-card dark:bg-[#111111] border border-border dark:border-white/5 rounded-[2.5rem] p-8 space-y-8 shadow-sm">
+          <div className="flex items-center justify-between gap-6">
+            <div className="space-y-1">
+              <p className="font-bold text-lg text-primary dark:text-white">Theme</p>
+              <p className="text-sm text-muted-foreground font-medium">Switch between light and dark mode</p>
+            </div>
+            <ModeToggle />
           </div>
-          <ModeToggle />
+
+          <div className="flex items-center justify-between gap-6">
+            <div className="space-y-1">
+              <p className="font-bold text-lg text-primary dark:text-white">Primary color</p>
+              <p className="text-sm text-muted-foreground font-medium">Choose the accent color used across the app</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {isMobile ? (
+                <Drawer open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
+                  <DrawerTrigger asChild>
+                    <Button variant="outline" className="rounded-2xl gap-2">
+                      <span className="h-4 w-4 rounded-md border border-border/60" style={{ backgroundColor: primaryColor }} />
+                      <span className="font-mono text-xs">{primaryColor}</span>
+                    </Button>
+                  </DrawerTrigger>
+                  <DrawerContent>
+                    <DrawerHeader className="px-6 pt-6">
+                      <DrawerTitle className="text-lg font-black">Primary color</DrawerTitle>
+                    </DrawerHeader>
+                    <div className="px-6 pb-10">{PrimaryColorPickerBody}</div>
+                  </DrawerContent>
+                </Drawer>
+              ) : (
+                <Popover open={colorPickerOpen} onOpenChange={setColorPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="rounded-2xl gap-2">
+                      <span className="h-4 w-4 rounded-md border border-border/60" style={{ backgroundColor: primaryColor }} />
+                      <span className="font-mono text-xs">{primaryColor}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-80 rounded-2xl">
+                    <div className="mb-3">
+                      <p className="font-bold text-sm">Choose a color</p>
+                      <p className="text-xs text-muted-foreground">Pick a preset or enter a hex value.</p>
+                    </div>
+                    {PrimaryColorPickerBody}
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Account Widget */}
       <div className="space-y-6">
-        <h2 className="text-3xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
+        <h2 className="text-xl font-black tracking-tight px-1 flex items-center gap-2 text-primary dark:text-white">
           <User className="h-5 w-5" />
           Account
         </h2>
@@ -351,7 +492,7 @@ const SettingsPage = () => {
           <Button
             variant="ghost"
             onClick={() => dispatch(logout())}
-            className="w-full h-14 rounded-2xl bg-rose-50 dark:bg-rose-500/5 text-rose-600 dark:text-rose-400 font-black uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-500/10 transition-all border border-rose-100/50 dark:border-rose-500/10"
+            className="w-full h-14 rounded-2xl border border-primary/20 bg-primary/10 text-primary font-black uppercase tracking-widest hover:bg-primary/15 hover:border-primary/30 transition-all active:scale-[0.99]"
           >
             <LogOut className="h-5 w-5 mr-2" />
             Sign Out

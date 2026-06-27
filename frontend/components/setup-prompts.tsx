@@ -9,22 +9,22 @@ import { useMemo } from 'react'
 
 export const EmailLinkPrompt = () => {
   return (
-    <div className="bg-orange-50 dark:bg-orange-500/5 border-2 border-orange-100 dark:border-orange-500/10 rounded-[2.5rem] p-8 space-y-4 relative overflow-hidden group mb-8">
+    <div className="bg-primary/10 dark:bg-primary/10 border-2 border-primary/15 dark:border-primary/20 rounded-[2.5rem] p-8 space-y-4 relative overflow-hidden group mb-8">
       <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-        <AlertCircle className="h-32 w-32 text-orange-500" />
+        <AlertCircle className="h-32 w-32 text-primary" />
       </div>
 
       <div className="space-y-2 relative z-10">
-        <h3 className="text-xl font-bold text-orange-800 dark:text-orange-400 flex items-center gap-2">
+        <h3 className="text-xl font-bold text-primary flex items-center gap-2">
           <AlertCircle className="h-6 w-6" />
           Email Not Linked
         </h3>
-        <p className="text-orange-700 dark:text-orange-300 text-sm font-medium max-w-[85%] leading-relaxed">
+        <p className="text-foreground/80 text-sm font-medium max-w-[85%] leading-relaxed">
           To automatically fetch and display your transactions, link the email account where you receive banking alerts.
         </p>
       </div>
 
-      <Button asChild className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl h-12 px-8 font-black shadow-xl shadow-orange-500/20 active:scale-95 transition-all relative z-10">
+      <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl h-12 px-8 font-black shadow-xl shadow-primary/20 active:scale-95 transition-all relative z-10">
         <Link href="/settings" className="flex items-center gap-2">
           Link Now
           <ArrowRight className="h-4 w-4" />

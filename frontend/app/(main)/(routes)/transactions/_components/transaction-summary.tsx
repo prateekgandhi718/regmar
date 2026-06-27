@@ -186,11 +186,11 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
         <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Month Average</p>
         <h2 className="text-xl font-black">{selectedData.displayRange}</h2>
         <div className="flex gap-4">
-          <span className="text-sm font-bold text-orange-500">
+          <span className="text-sm font-bold text-primary">
             -₹{formatAmount(selectedData.avgExpenses)}
             {!selectedMonthYear && '/mth'}
           </span>
-          <span className="text-sm font-bold text-blue-400">
+          <span className="text-sm font-bold text-primary/80">
             ₹{formatAmount(selectedData.avgInvestments)}
             {!selectedMonthYear && '/mth'}
           </span>
@@ -205,12 +205,12 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
             <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }} tickFormatter={(value) => `${value / 1000}K`} />
             <Bar name="expenses" dataKey="expenses" radius={[4, 4, 0, 0]} barSize={16} pointerEvents="none">
               {chartData.map((entry, index) => (
-                <Cell key={`cell-exp-${index}`} fill="#f97316" />
+                <Cell key={`cell-exp-${index}`} fill="var(--color-primary)" />
               ))}
             </Bar>
             <Bar name="investments" dataKey="investments" radius={[4, 4, 0, 0]} barSize={16} pointerEvents="none">
               {chartData.map((entry, index) => (
-                <Cell key={`cell-inv-${index}`} fill="#60a5fa" />
+                <Cell key={`cell-inv-${index}`} fill="var(--chart-2)" />
               ))}
             </Bar>
           </BarChart>
@@ -219,11 +219,11 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
 
       <div className="flex gap-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2">
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full bg-orange-500" />
+          <div className="h-3 w-3 rounded-full bg-primary" />
           Expense
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rounded-full bg-blue-400" />
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: 'var(--chart-2)' }} />
           Investment
         </div>
       </div>

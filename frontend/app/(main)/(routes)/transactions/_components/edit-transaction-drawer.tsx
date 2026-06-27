@@ -238,7 +238,7 @@ export const EditTransactionDrawer = ({ transaction, isOpen, onClose }: EditTran
           <Button
             disabled={isUpdating}
             onClick={handleSave}
-            className="rounded-2xl h-14 bg-linear-to-r from-orange-500 to-rose-500 hover:opacity-90 text-white font-black text-sm uppercase tracking-tight shadow-lg shadow-orange-500/20 active:scale-95 transition-all"
+            className="rounded-2xl h-14 bg-linear-to-r from-primary to-primary/70 hover:opacity-90 text-primary-foreground font-black text-sm uppercase tracking-tight shadow-lg shadow-primary/20 active:scale-95 transition-all"
           >
             {isUpdating ? 'Saving...' : 'Save'}
           </Button>

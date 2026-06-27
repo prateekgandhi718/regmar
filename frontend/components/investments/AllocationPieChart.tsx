@@ -12,7 +12,7 @@ interface AllocationPieChartProps {
   hideValues?: boolean
 }
 
-const CHART_COLORS = ['#f59e0b', '#3b82f6', '#8b5cf6']
+const CHART_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)']
 
 export const AllocationPieChart = ({ mutualFundsValue, etfValue, stocksValue, hideValues }: AllocationPieChartProps) => {
   const { theme } = useTheme()

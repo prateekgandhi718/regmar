@@ -17,7 +17,20 @@ export const AccountCard = ({ title, accountNumber, domainName, currency, classN
   const iconUrl = extractedDomain ? getLogoUrl(extractedDomain) : null
 
   return (
-    <Card className={cn('relative w-64 aspect-video rounded-2xl p-4 text-white overflow-hidden border-none shadow-lg shrink-0', 'bg-linear-to-br from-rose-500 via-rose-600 to-rose-800', className)}>
+    <Card
+      className={cn(
+        'relative w-64 aspect-video rounded-2xl p-4 text-white overflow-hidden border-none shadow-lg shrink-0',
+        // Metallic primary gradient
+        'bg-linear-to-br from-primary via-primary/80 to-primary/60',
+        className,
+      )}
+    >
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 h-56 w-56 rounded-full bg-white/20 blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 h-56 w-56 rounded-full bg-black/25 blur-3xl" />
+        <div className="absolute inset-0 bg-linear-to-br from-white/15 via-transparent to-black/10" />
+      </div>
+
       <div className="flex justify-between items-start">
         <div className="space-y-0.5">
           <h3 className="font-bold text-lg tracking-wider uppercase leading-none">{title}</h3>

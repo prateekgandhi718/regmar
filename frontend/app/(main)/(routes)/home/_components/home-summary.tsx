@@ -28,7 +28,6 @@ import { cn } from '@/lib/utils'
 import { useSelector } from 'react-redux'
 import { selectCurrentUser } from '@/redux/features/authSlice'
 import { ArrowDown, ArrowUp } from 'lucide-react'
-import { useTheme } from 'next-themes'
 import { isExpense, getTransactionAmount } from '@/lib/transactions'
 
 interface HomeSummaryProps {
@@ -41,7 +40,6 @@ type Period = 'today' | 'week' | 'month'
 export const HomeSummary = ({ transactions, action }: HomeSummaryProps) => {
   const user = useSelector(selectCurrentUser)
   const [period, setPeriod] = useState<Period>('month')
-  const { theme } = useTheme()
   const stats = useMemo(() => {
     const now = new Date()
 
@@ -246,7 +244,7 @@ export const HomeSummary = ({ transactions, action }: HomeSummaryProps) => {
         <div className="space-y-6">
           <button onClick={togglePeriod} className="flex items-center gap-2 text-muted-foreground font-bold hover:text-primary transition-colors group/btn">
             <span className="text-sm uppercase tracking-widest">Spent</span>
-            <span className="text-primary dark:text-white bg-secondary dark:bg-white/10 px-3 py-1 rounded-xl text-sm group-hover/btn:bg-secondary/80 dark:group-hover/btn:bg-white/20 transition-colors">
+            <span className="text-primary bg-secondary dark:bg-white/10 px-3 py-1 rounded-xl text-sm group-hover/btn:bg-secondary/80 dark:group-hover/btn:bg-white/20 transition-colors">
               {currentStats.label}
             </span>
           </button>
@@ -255,7 +253,7 @@ export const HomeSummary = ({ transactions, action }: HomeSummaryProps) => {
             <div className="space-y-2">
               <div className="flex items-start gap-1">
                 <span className="text-2xl font-black mt-2">₹</span>
-                <span className="text-6xl font-black tracking-tighter text-primary dark:text-white">
+                <span className="text-6xl font-black tracking-tighter text-primary">
                   {currentStats.current >= 1000 ? formatAmount(currentStats.current) : Math.round(currentStats.current)}
                 </span>
                 {period !== 'month' && <span className="text-2xl font-black text-muted-foreground mt-2">{period === 'today' ? 'd' : 'w'}</span>}
@@ -264,23 +262,23 @@ export const HomeSummary = ({ transactions, action }: HomeSummaryProps) => {
               <div className="flex gap-4">
                 {period !== 'today' && (
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-sm font-bold text-primary dark:text-white">₹</span>
-                    <span className="text-2xl font-black tracking-tight text-primary dark:text-white">{formatAmount(stats.today.current)}</span>
-                    <span className="text-sm font-bold text-orange-500 ml-0.5">d</span>
+                    <span className="text-sm font-bold text-primary">₹</span>
+                    <span className="text-2xl font-black tracking-tight text-primary">{formatAmount(stats.today.current)}</span>
+                    <span className="text-sm font-bold text-primary/80 ml-0.5">d</span>
                   </div>
                 )}
                 {period !== 'week' && (
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-sm font-bold text-primary dark:text-white">₹</span>
-                    <span className="text-2xl font-black tracking-tight text-primary dark:text-white">{formatAmount(stats.week.current)}</span>
-                    <span className="text-sm font-bold text-orange-500 ml-0.5">w</span>
+                    <span className="text-sm font-bold text-primary">₹</span>
+                    <span className="text-2xl font-black tracking-tight text-primary">{formatAmount(stats.week.current)}</span>
+                    <span className="text-sm font-bold text-primary/80 ml-0.5">w</span>
                   </div>
                 )}
                 {period !== 'month' && (
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-sm font-bold text-primary dark:text-white">₹</span>
-                    <span className="text-2xl font-black tracking-tight text-primary dark:text-white">{formatAmount(stats.month.current)}</span>
-                    <span className="text-sm font-bold text-orange-500 ml-0.5">m</span>
+                    <span className="text-sm font-bold text-primary">₹</span>
+                    <span className="text-2xl font-black tracking-tight text-primary">{formatAmount(stats.month.current)}</span>
+                    <span className="text-sm font-bold text-primary/80 ml-0.5">m</span>
                   </div>
                 )}
               </div>
@@ -296,9 +294,9 @@ export const HomeSummary = ({ transactions, action }: HomeSummaryProps) => {
             <div className="h-32 w-1/2 -mb-8 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <Line type="monotone" dataKey="previous" stroke={theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'} strokeWidth={2} dot={false} strokeDasharray="5 5" />
-                  <Line type="monotone" dataKey="current" stroke={theme === 'dark' ? '#ffffff' : '#000000'} strokeWidth={3} dot={false} animationDuration={1500} />
-                  <Tooltip content={() => null} cursor={{ stroke: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', strokeWidth: 1 }} />
+                  <Line type="monotone" dataKey="previous" stroke="var(--chart-3)" strokeOpacity={0.25} strokeWidth={2} dot={false} strokeDasharray="5 5" />
+                  <Line type="monotone" dataKey="current" stroke="var(--chart-1)" strokeWidth={3} dot={false} animationDuration={1500} />
+                  <Tooltip content={() => null} cursor={{ stroke: 'var(--chart-3)', strokeOpacity: 0.2, strokeWidth: 1 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

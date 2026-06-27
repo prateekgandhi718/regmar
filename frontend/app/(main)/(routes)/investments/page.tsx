@@ -159,8 +159,8 @@ const InvestmentsPage = () => {
                 title="Mutual Funds"
                 subtitle={`${investments.mutualFunds.length} Funds`}
                 value={hideValues ? '••••••' : formatCurrency(summary.mfFolioValue + summary.mfDematValue)}
-                icon={<Layers className="h-7 w-7 text-orange-500" />}
-                iconBgColor="bg-orange-50"
+                icon={<Layers className="h-7 w-7 text-primary" />}
+                iconBgColor="bg-primary/10"
                 onClick={() => router.push('/investments/mutual-funds')}
               />
 
@@ -168,8 +168,8 @@ const InvestmentsPage = () => {
                 title="Stocks"
                 subtitle={`${investments.stocks.length} Stocks`}
                 value={hideValues ? '••••••' : formatCurrency(summary.equityValue)}
-                icon={<TrendingUp className="h-7 w-7 text-blue-500" />}
-                iconBgColor="bg-blue-50"
+                icon={<TrendingUp className="h-7 w-7 text-primary" />}
+                iconBgColor="bg-primary/10"
                 onClick={() => router.push('/investments/stocks')}
               />
 

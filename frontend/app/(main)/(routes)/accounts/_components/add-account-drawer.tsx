@@ -121,14 +121,14 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
 
         <div className="px-6 py-8 space-y-10 overflow-y-auto">
           {!isLinked && !isLoadingLinked && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex gap-4 items-start">
-              <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
+            <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex gap-4 items-start">
+              <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
               <div className="space-y-2">
-                <p className="text-sm font-bold text-orange-800">Email Account Required</p>
-                <p className="text-xs text-orange-700 leading-relaxed">
+                <p className="text-sm font-bold text-primary">Email Account Required</p>
+                <p className="text-xs text-foreground/80 leading-relaxed">
                   Link the email account where you receive banking alerts before adding bank accounts. This allows automatic transaction sync.
                 </p>
-                <Button variant="link" className="p-0 h-auto text-xs text-orange-800 font-bold underline" asChild>
+                <Button variant="link" className="p-0 h-auto text-xs text-primary font-bold underline" asChild>
                   <Link href="/settings">Go to Settings</Link>
                 </Button>
               </div>
@@ -206,7 +206,7 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
                   )}
                 </div>
               ))}
-              <button onClick={handleAddDomain} className="w-full h-14 flex items-center justify-center gap-2 text-sm font-bold text-orange-500 hover:bg-secondary/80 transition-all active:scale-95">
+              <button onClick={handleAddDomain} className="w-full h-14 flex items-center justify-center gap-2 text-sm font-bold text-primary hover:bg-secondary/80 transition-all active:scale-95">
                 <Plus className="h-4 w-4" />
                 Add Domain
               </button>
@@ -219,7 +219,7 @@ export const AddAccountDrawer = ({ isOpen, onClose, initialData }: AddAccountDra
             Cancel
           </Button>
           <Button
-            className="flex-1 h-14 rounded-2xl font-black bg-linear-to-r from-orange-500 to-rose-500 text-white border-none shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
+            className="flex-1 h-14 rounded-2xl font-black bg-linear-to-r from-primary to-primary/70 text-primary-foreground border-none shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50"
             onClick={handleSubmit}
             disabled={isSubmitting || !title || !isLinked}
           >

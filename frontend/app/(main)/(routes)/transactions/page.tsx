@@ -139,7 +139,7 @@ const TransactionsPage = () => {
         <h1 className="text-3xl font-black tracking-tight">Transactions</h1>
         <div className="flex gap-2">
           {selectedMonthYear && (
-            <Button variant="secondary" size="sm" className="rounded-xl font-bold bg-orange-100 text-orange-600 border-none h-9 px-4 hover:bg-orange-200" onClick={() => setSelectedMonthYear(null)}>
+            <Button variant="secondary" size="sm" className="rounded-xl font-bold bg-primary/15 text-primary border-none h-9 px-4 hover:bg-primary/20" onClick={() => setSelectedMonthYear(null)}>
               {selectedMonthYear} <span className="ml-1 opacity-50">×</span>
             </Button>
           )}
