@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { EditTransactionDrawer } from './edit-transaction-drawer'
 import { getLogoUrl } from '@/lib/logos'
 import { EmailContentSection } from './email-content-section'
+import { CategoryIcon } from '@/components/category-icon'
 
 interface TransactionDetailDrawerProps {
   transaction: Transaction | null
@@ -49,9 +50,9 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
           {/* Main Transaction Card */}
           <div className="bg-white dark:bg-zinc-900 rounded-3xl p-6 shadow-sm border border-border/40">
             <div className="flex items-start gap-4">
-              <div className="h-16 w-16 rounded-2xl bg-indigo-100 flex items-center justify-center overflow-hidden shrink-0">
-                {transaction.categoryId?.emoji ? (
-                  <span className="text-3xl">{transaction.categoryId.emoji}</span>
+              <div className="h-16 w-16 rounded-2xl bg-primary/10 border border-primary/15 flex items-center justify-center overflow-hidden shrink-0">
+                {transaction.categoryId ? (
+                  <CategoryIcon name={transaction.categoryId.name} className="h-7 w-7" />
                 ) : (
                   <Image src={logoUrl} alt="Bank Logo" width={40} height={40} className="w-10 h-10 object-contain" />
                 )}
@@ -96,8 +97,10 @@ export const TransactionDetailDrawer = ({ transaction, isOpen, onClose }: Transa
           <div className="space-y-2">
             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">Category</p>
             <div className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-border/40">
-              <div className="flex items-center gap-3" style={{ color: transaction.categoryId?.color }}>
-                <span className="text-xl">{transaction.categoryId?.emoji || '💰'}</span>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+                  <CategoryIcon name={transaction.categoryId?.name} className="h-5 w-5" />
+                </div>
                 <span className="text-sm font-black uppercase tracking-tight">{transaction.categoryId?.name || 'Uncategorized'}</span>
               </div>
             </div>

@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell }
 import { formatAmount } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { isInvestment, isExpense, getTransactionAmount } from '@/lib/transactions'
+import { CategoryIcon } from '@/components/category-icon'
 
 const ACCOUNT_COLORS = ['bg-red-500', 'bg-indigo-500', 'bg-purple-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-teal-500', 'bg-rose-500', 'bg-lime-500']
 
@@ -84,7 +85,7 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
       let totalExpenses = 0
       let totalInvestments = 0
       const accountMap: Record<string, number> = {}
-      const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {}
+      const categoryMap: Record<string, { amount: number }> = {}
 
       const monthsInRange = chartData.map((d) => d.fullMonthYear)
 
@@ -111,8 +112,6 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
               if (!categoryMap[catName]) {
                 categoryMap[catName] = {
                   amount: 0,
-                  emoji: tx.categoryId.emoji,
-                  color: tx.categoryId.color || '#94a3b8',
                 }
               }
               categoryMap[catName].amount += amount
@@ -136,7 +135,7 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
     let totalExpenses = 0
     let totalInvestments = 0
     const accountMap: Record<string, number> = {}
-    const categoryMap: Record<string, { amount: number; emoji: string; color: string }> = {}
+    const categoryMap: Record<string, { amount: number }> = {}
 
     transactions.forEach((tx) => {
       if (tx.refunded) return
@@ -159,8 +158,6 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
             if (!categoryMap[catName]) {
               categoryMap[catName] = {
                 amount: 0,
-                emoji: tx.categoryId.emoji,
-                color: tx.categoryId.color || '#94a3b8',
               }
             }
             categoryMap[catName].amount += amount
@@ -254,8 +251,8 @@ export const TransactionSummary = ({ transactions, selectedMonthYear, dateRange 
           <div className="flex gap-3 min-w-max">
             {selectedData.categories.map((cat) => (
               <div key={cat.name} className="bg-secondary/20 p-4 rounded-3xl flex flex-col gap-2 min-w-[120px]">
-                <div className="h-10 w-16 rounded-2xl flex items-center justify-center text-xl" style={{ backgroundColor: cat.color + '20' }}>
-                  {cat.emoji}
+                <div className="h-10 w-16 rounded-2xl flex items-center justify-center bg-primary/10 border border-primary/10">
+                  <CategoryIcon name={cat.name} className="h-5 w-5" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase truncate w-24">{cat.name}</p>

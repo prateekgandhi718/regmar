@@ -66,8 +66,6 @@ export interface Transaction {
   categoryId?: {
     _id: string
     name: string
-    emoji: string
-    color?: string
   }
 }
 

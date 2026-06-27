@@ -15,6 +15,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { CategoryIcon } from '@/components/category-icon'
 
 interface EditTransactionDrawerProps {
   transaction: Transaction | null
@@ -205,12 +206,10 @@ export const EditTransactionDrawer = ({ transaction, isOpen, onClose }: EditTran
                   className="w-full p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xl" style={{ color: cat.color }}>
-                      {cat.emoji}
-                    </span>
-                    <span className="text-sm font-black uppercase tracking-tight" style={{ color: cat.color }}>
-                      {cat.name}
-                    </span>
+                    <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+                      <CategoryIcon name={cat.name} className="h-5 w-5" />
+                    </div>
+                    <span className="text-sm font-black uppercase tracking-tight">{cat.name}</span>
                   </div>
                   <div
                     className={cn(

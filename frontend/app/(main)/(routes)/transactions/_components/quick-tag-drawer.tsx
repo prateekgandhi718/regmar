@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { EmailContentSection } from './email-content-section'
+import { CategoryIcon } from '@/components/category-icon'
 
 interface QuickTagDrawerProps {
   transaction: Transaction | null
@@ -73,13 +74,12 @@ export const QuickTagDrawer = ({ transaction, isOpen, onClose }: QuickTagDrawerP
                     key={category._id}
                     onClick={() => handleSelectCategory(category._id)}
                     disabled={isTagging}
-                    className={cn('flex items-center gap-2 px-4 py-2 rounded-full border-2 transition-all active:scale-95 disabled:opacity-50', 'hover:bg-secondary/50')}
-                    style={{
-                      borderColor: category.color || 'var(--border)',
-                      color: category.color || 'var(--foreground)',
-                    }}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2 rounded-full border transition-all active:scale-95 disabled:opacity-50',
+                      'border-primary/20 hover:bg-primary/10',
+                    )}
                   >
-                    <span className="text-lg leading-none">{category.emoji}</span>
+                    <CategoryIcon name={category.name} />
                     <span className="text-xs font-black uppercase tracking-tight">{category.name}</span>
                   </button>
                 ))}
